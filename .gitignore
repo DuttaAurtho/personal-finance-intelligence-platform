@@ -1,0 +1,17 @@
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# Local database — contains real financial data, never commit
+data/
+*.sqlite
+*.sqlite-journal
+*.db
+
+.env
+.env*.local
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
