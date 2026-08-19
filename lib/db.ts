@@ -231,6 +231,42 @@ export const all = rootQueries.all;
 export const get = rootQueries.get;
 export const run = rootQueries.run;
 
+export interface BatchStatement {
+  sql: string;
+  params?: unknown[];
+}
+
+/**
+ * Runs many statements as one atomic round trip.
+ *
+ * `run()` called in a loop is fine against the local file this app started
+ * with, where each call costs microseconds — but against a hosted database
+ * every call is a network request, and a statement-per-row import of a real
+ * bank statement turns into hundreds of sequential round trips, easily
+ * blowing past a serverless function's time limit. `batch()` sends the whole
+ * set in a single request instead, cutting an N-row import from N round trips
+ * to one (or a handful, once chunked by the caller for very large imports).
+ *
+ * Statements are already-parameterised at call time — there is no facility to
+ * read one statement's result and feed it into a later one in the same batch,
+ * because they all go over the wire together. Run anything with that kind of
+ * dependency as its own `run()`/`get()` before or after the batch.
+ */
+export async function batch(
+  statements: BatchStatement[],
+): Promise<{ changes: number; lastInsertRowid: number }[]> {
+  if (!statements.length) return [];
+  await ready();
+  const results = await client().batch(
+    statements.map((s) => ({ sql: s.sql, args: normalise(s.params ?? []) })),
+    "write",
+  );
+  return results.map((rs) => ({
+    changes: Number(rs.rowsAffected ?? 0),
+    lastInsertRowid: rs.lastInsertRowid === undefined ? 0 : Number(rs.lastInsertRowid),
+  }));
+}
+
 /**
  * Runs `fn` inside a real database transaction, rolling back on any throw.
  * The callback receives its own `{ all, get, run }` bound to the transaction

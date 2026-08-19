@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { all, get, placeholders, run, transact } from "./db";
+import { all, batch, get, placeholders, run, transact } from "./db";
 import { DEFAULT_CATEGORIES } from "./categories";
 import { Categorizer, merchantKey, normalizeDescription } from "./categorize";
 import type { TrainingSample, UserRule } from "./categorize";
@@ -17,42 +17,37 @@ import type { ParsedRow } from "./csv";
 
 /** Idempotently give a new user their category taxonomy and a default account. */
 export async function ensureUserSetup(userId: number): Promise<Account> {
-  return transact(async (t) => {
-    const existing = await t.get<{ n: number }>(
-      "SELECT COUNT(*) AS n FROM categories WHERE user_id = ?",
-      userId,
+  const existing = await get<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM categories WHERE user_id = ?",
+    userId,
+  );
+  if (!existing?.n) {
+    // One round trip for the whole taxonomy rather than one per category —
+    // this runs on a brand-new user's very first request.
+    await batch(
+      DEFAULT_CATEGORIES.map((c, i) => ({
+        sql: `INSERT OR IGNORE INTO categories (user_id, name, icon, color, kind, sort)
+              VALUES (?, ?, ?, ?, ?, ?)`,
+        params: [userId, c.name, c.icon, c.color, c.kind, i],
+      })),
     );
-    if (!existing?.n) {
-      for (const [i, c] of DEFAULT_CATEGORIES.entries()) {
-        await t.run(
-          `INSERT OR IGNORE INTO categories (user_id, name, icon, color, kind, sort)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          userId,
-          c.name,
-          c.icon,
-          c.color,
-          c.kind,
-          i,
-        );
-      }
-    }
+  }
 
-    let account = await t.get<Account>(
-      "SELECT * FROM accounts WHERE user_id = ? ORDER BY id ASC LIMIT 1",
+  let account = await get<Account>(
+    "SELECT * FROM accounts WHERE user_id = ? ORDER BY id ASC LIMIT 1",
+    userId,
+  );
+  if (!account) {
+    const { lastInsertRowid } = await run(
+      "INSERT INTO accounts (user_id, name, institution, type) VALUES (?, ?, ?, ?)",
       userId,
+      "Main Account",
+      null,
+      "current",
     );
-    if (!account) {
-      const { lastInsertRowid } = await t.run(
-        "INSERT INTO accounts (user_id, name, institution, type) VALUES (?, ?, ?, ?)",
-        userId,
-        "Main Account",
-        null,
-        "current",
-      );
-      account = (await t.get<Account>("SELECT * FROM accounts WHERE id = ?", lastInsertRowid))!;
-    }
-    return account;
-  });
+    account = (await get<Account>("SELECT * FROM accounts WHERE id = ?", lastInsertRowid))!;
+  }
+  return account;
 }
 
 export function listAccounts(userId: number): Promise<Account[]> {
@@ -161,54 +156,61 @@ export async function importTransactions(
     ).map((r) => r.fingerprint),
   );
 
-  return transact(async (t) => {
-    const { lastInsertRowid: batchId } = await t.run(
-      "INSERT INTO import_batches (user_id, filename, row_count) VALUES (?, ?, ?)",
-      userId,
-      filename.slice(0, 200),
-      rows.length,
-    );
+  const { lastInsertRowid: batchId } = await run(
+    "INSERT INTO import_batches (user_id, filename, row_count) VALUES (?, ?, ?)",
+    userId,
+    filename.slice(0, 200),
+    rows.length,
+  );
 
-    let imported = 0;
-    let duplicates = 0;
-    let categorised = 0;
-    let needsReview = 0;
+  let duplicates = 0;
+  let categorised = 0;
+  let needsReview = 0;
+  const seen = new Map<string, number>();
 
-    const seen = new Map<string, number>();
+  // Classification is pure JS and de-duplication is against an in-memory set,
+  // so the whole pass below needs no I/O — every insert statement for the
+  // file is built up-front, then sent as a handful of batched round trips
+  // rather than one round trip per row. Against a hosted database that's the
+  // difference between an import finishing in under a second and one that
+  // blows past a serverless function's time limit.
+  const statements: { sql: string; params: unknown[] }[] = [];
+  const insertSql = `INSERT INTO transactions
+       (user_id, account_id, date, description, merchant, amount_minor,
+        category, confidence, is_confirmed, is_transfer, fingerprint, batch_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`;
 
-    for (const row of rows) {
-      const base = fingerprintBase(accountId, row);
+  for (const row of rows) {
+    const base = fingerprintBase(accountId, row);
 
-      // The nth identical row *within this file* claims occurrence slot n.
-      // Counting within the file rather than searching for a free slot is what
-      // makes re-imports idempotent: the same statement always produces the
-      // same fingerprints, so every row is recognised the second time round,
-      // while two genuinely distinct same-day coffees still get slots 0 and 1.
-      const idx = seen.get(base) ?? 0;
-      seen.set(base, idx + 1);
-      const fingerprint = `${base}:${idx}`;
+    // The nth identical row *within this file* claims occurrence slot n.
+    // Counting within the file rather than searching for a free slot is what
+    // makes re-imports idempotent: the same statement always produces the
+    // same fingerprints, so every row is recognised the second time round,
+    // while two genuinely distinct same-day coffees still get slots 0 and 1.
+    const idx = seen.get(base) ?? 0;
+    seen.set(base, idx + 1);
+    const fingerprint = `${base}:${idx}`;
 
-      if (existing.has(fingerprint)) {
-        duplicates++;
-        continue;
-      }
+    if (existing.has(fingerprint)) {
+      duplicates++;
+      continue;
+    }
 
-      const prediction = categorizer.classify(row.description, row.amountMinor, row.date);
+    const prediction = categorizer.classify(row.description, row.amountMinor, row.date);
 
-      // A category column in the source file is a stronger signal than our guess.
-      const category = row.suggestedCategory && knownCategories.has(row.suggestedCategory)
-        ? row.suggestedCategory
-        : prediction.category;
-      const confidence = row.suggestedCategory && category === row.suggestedCategory ? 0.95 : prediction.confidence;
+    // A category column in the source file is a stronger signal than our guess.
+    const category = row.suggestedCategory && knownCategories.has(row.suggestedCategory)
+      ? row.suggestedCategory
+      : prediction.category;
+    const confidence = row.suggestedCategory && category === row.suggestedCategory ? 0.95 : prediction.confidence;
 
-      const merchant = merchantKey(row.description);
-      const isTransfer = categoryIsTransfer(category) ? 1 : 0;
+    const merchant = merchantKey(row.description);
+    const isTransfer = categoryIsTransfer(category) ? 1 : 0;
 
-      await t.run(
-        `INSERT INTO transactions
-           (user_id, account_id, date, description, merchant, amount_minor,
-            category, confidence, is_confirmed, is_transfer, fingerprint, batch_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+    statements.push({
+      sql: insertSql,
+      params: [
         userId,
         accountId,
         row.date,
@@ -220,23 +222,30 @@ export async function importTransactions(
         isTransfer,
         fingerprint,
         batchId,
-      );
+      ],
+    });
 
-      existing.add(fingerprint);
-      imported++;
-      if (category !== "Uncategorised" && confidence >= 0.6) categorised++;
-      else needsReview++;
-    }
+    existing.add(fingerprint);
+    if (category !== "Uncategorised" && confidence >= 0.6) categorised++;
+    else needsReview++;
+  }
 
-    await t.run(
-      "UPDATE import_batches SET imported_count = ?, duplicate_count = ? WHERE id = ?",
-      imported,
-      duplicates,
-      batchId,
-    );
+  // Chunked rather than one giant batch: keeps each request a sane size and
+  // caps how much work is lost if one chunk fails partway through a huge file.
+  const CHUNK = 300;
+  for (let i = 0; i < statements.length; i += CHUNK) {
+    await batch(statements.slice(i, i + CHUNK));
+  }
 
-    return { batchId, imported, duplicates, categorised, needsReview, total: rows.length };
-  });
+  const imported = statements.length;
+  await run(
+    "UPDATE import_batches SET imported_count = ?, duplicate_count = ? WHERE id = ?",
+    imported,
+    duplicates,
+    batchId,
+  );
+
+  return { batchId, imported, duplicates, categorised, needsReview, total: rows.length };
 }
 
 const TRANSFER_NAMES = new Set(["Transfers", "Savings", "Investments", "Credit Card Payment"]);
@@ -337,23 +346,27 @@ export async function recategorizeAll(userId: number): Promise<{ updated: number
   );
 
   let updated = 0;
-  await transact(async (t) => {
-    for (const tx of rows) {
-      const p = categorizer.classify(tx.description, tx.amount_minor, tx.date);
-      if (p.category !== tx.category) {
-        await t.run(
-          `UPDATE transactions SET category = ?, confidence = ?, is_transfer = ? WHERE id = ?`,
-          p.category,
-          p.confidence,
-          categoryIsTransfer(p.category) ? 1 : 0,
-          tx.id,
-        );
-        updated++;
-      } else {
-        await t.run("UPDATE transactions SET confidence = ? WHERE id = ?", p.confidence, tx.id);
-      }
+  const statements: { sql: string; params: unknown[] }[] = [];
+  for (const tx of rows) {
+    const p = categorizer.classify(tx.description, tx.amount_minor, tx.date);
+    if (p.category !== tx.category) {
+      statements.push({
+        sql: `UPDATE transactions SET category = ?, confidence = ?, is_transfer = ? WHERE id = ?`,
+        params: [p.category, p.confidence, categoryIsTransfer(p.category) ? 1 : 0, tx.id],
+      });
+      updated++;
+    } else {
+      statements.push({
+        sql: "UPDATE transactions SET confidence = ? WHERE id = ?",
+        params: [p.confidence, tx.id],
+      });
     }
-  });
+  }
+
+  const CHUNK = 300;
+  for (let i = 0; i < statements.length; i += CHUNK) {
+    await batch(statements.slice(i, i + CHUNK));
+  }
 
   return { updated, scanned: rows.length };
 }
@@ -364,11 +377,14 @@ export async function rebuildMerchants(userId: number): Promise<number> {
     "SELECT id, description FROM transactions WHERE user_id = ?",
     userId,
   );
-  await transact(async (t) => {
-    for (const r of rows) {
-      await t.run("UPDATE transactions SET merchant = ? WHERE id = ?", merchantKey(r.description), r.id);
-    }
-  });
+  const statements = rows.map((r) => ({
+    sql: "UPDATE transactions SET merchant = ? WHERE id = ?",
+    params: [merchantKey(r.description), r.id],
+  }));
+  const CHUNK = 300;
+  for (let i = 0; i < statements.length; i += CHUNK) {
+    await batch(statements.slice(i, i + CHUNK));
+  }
   return rows.length;
 }
 
@@ -413,6 +429,22 @@ export function setBudget(userId: number, category: string, amountMinor: number)
     userId,
     category,
     amountMinor,
+  );
+}
+
+/** Set several budgets in one round trip — used when adopting a whole set of suggestions at once. */
+export function setBudgets(userId: number, entries: { category: string; amountMinor: number }[]) {
+  if (!entries.length) return Promise.resolve([]);
+  return batch(
+    entries.map(({ category, amountMinor }) =>
+      amountMinor <= 0
+        ? { sql: "DELETE FROM budgets WHERE user_id = ? AND category = ?", params: [userId, category] }
+        : {
+            sql: `INSERT INTO budgets (user_id, category, amount_minor) VALUES (?, ?, ?)
+                  ON CONFLICT(user_id, category) DO UPDATE SET amount_minor = excluded.amount_minor`,
+            params: [userId, category, amountMinor],
+          },
+    ),
   );
 }
 

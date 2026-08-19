@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth";
-import { setBudget, suggestBudgets } from "@/lib/repository";
+import { setBudget, setBudgets, suggestBudgets } from "@/lib/repository";
 import { parseAmount } from "@/lib/money";
 
 function refresh() {
@@ -37,7 +37,7 @@ export async function applyAllSuggestions(): Promise<void> {
   const user = await requireUser();
   const suggestions = await suggestBudgets(user.id, 6);
 
-  for (const s of suggestions) await setBudget(user.id, s.category, s.amountMinor);
+  await setBudgets(user.id, suggestions);
 
   refresh();
 }

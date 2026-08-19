@@ -1,6 +1,6 @@
 import type { ParsedRow } from "./csv";
 import { addDays, daysInMonth, monthKey, todayISO, addMonths } from "./dates";
-import { importTransactions, setBudget, suggestBudgets } from "./repository";
+import { importTransactions, setBudgets, suggestBudgets } from "./repository";
 
 /**
  * Synthetic but realistic demo data.
@@ -263,9 +263,7 @@ export async function seedDemoData(userId: number, accountId: number, months = 2
   // Budgets derived from the generated history, so they're realistic and the
   // budget page has something meaningful to show immediately.
   const suggestions = await suggestBudgets(userId, 6);
-  for (const s of suggestions.slice(0, 9)) {
-    await setBudget(userId, s.category, s.amountMinor);
-  }
+  await setBudgets(userId, suggestions.slice(0, 9));
 
   return summary;
 }
