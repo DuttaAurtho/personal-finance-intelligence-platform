@@ -38,10 +38,10 @@ export default async function InsightsPage({
   const user = await requireUser();
   const sp = await searchParams;
 
-  const months = availableMonths(user.id);
+  const months = await availableMonths(user.id);
   const month = sp.month && months.includes(sp.month) ? sp.month : months[0] ?? currentMonth();
 
-  const data = getDashboard(user, month);
+  const data = await getDashboard(user, month);
   const cur = user.currency;
 
   if (!data) {

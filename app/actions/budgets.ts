@@ -14,14 +14,14 @@ export async function saveBudget(category: string, amount: string) {
   const minor = parseAmount(amount);
   if (minor === null) return { ok: false, error: "That isn't a valid amount." };
 
-  setBudget(user.id, category, Math.abs(minor));
+  await setBudget(user.id, category, Math.abs(minor));
   refresh();
   return { ok: true };
 }
 
 export async function clearBudget(category: string) {
   const user = await requireUser();
-  setBudget(user.id, category, 0);
+  await setBudget(user.id, category, 0);
   refresh();
   return { ok: true };
 }
@@ -35,9 +35,9 @@ export async function clearBudget(category: string) {
  */
 export async function applyAllSuggestions(): Promise<void> {
   const user = await requireUser();
-  const suggestions = suggestBudgets(user.id, 6);
+  const suggestions = await suggestBudgets(user.id, 6);
 
-  for (const s of suggestions) setBudget(user.id, s.category, s.amountMinor);
+  for (const s of suggestions) await setBudget(user.id, s.category, s.amountMinor);
 
   refresh();
 }

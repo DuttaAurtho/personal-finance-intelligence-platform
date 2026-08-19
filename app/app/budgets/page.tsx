@@ -22,12 +22,14 @@ export default async function BudgetsPage({
   const user = await requireUser();
   const sp = await searchParams;
 
-  const months = availableMonths(user.id);
+  const months = await availableMonths(user.id);
   const month = sp.month && months.includes(sp.month) ? sp.month : months[0] ?? currentMonth();
 
-  const budgets = getBudgetStatus(user.id, month);
-  const suggestions = suggestBudgets(user.id, 6);
-  const kpis = getKpis(user.id, monthStart(month), monthEnd(month));
+  const [budgets, suggestions, kpis] = await Promise.all([
+    getBudgetStatus(user.id, month),
+    suggestBudgets(user.id, 6),
+    getKpis(user.id, monthStart(month), monthEnd(month)),
+  ]);
   const cur = user.currency;
 
   const totalBudget = budgets.reduce((a, b) => a + b.budgetMinor, 0);

@@ -38,11 +38,13 @@ export default async function TransactionsPage({
   const user = await requireUser();
   const sp = await searchParams;
 
-  const categories = all<{ name: string; kind: string }>(
-    "SELECT name, kind FROM categories WHERE user_id = ? ORDER BY sort ASC",
-    user.id,
-  );
-  const accounts = listAccounts(user.id);
+  const [categories, accounts] = await Promise.all([
+    all<{ name: string; kind: string }>(
+      "SELECT name, kind FROM categories WHERE user_id = ? ORDER BY sort ASC",
+      user.id,
+    ),
+    listAccounts(user.id),
+  ]);
 
   const page = Math.max(1, Number(sp.page) || 1);
 
@@ -66,7 +68,7 @@ export default async function TransactionsPage({
     offset: (page - 1) * PAGE_SIZE,
   };
 
-  const { rows, total, sumMinor } = queryTransactions(user.id, filters);
+  const { rows, total, sumMinor } = await queryTransactions(user.id, filters);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Preserve every active filter when building pagination and export links.

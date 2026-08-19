@@ -14,7 +14,11 @@ export default async function RegisterPage() {
   return (
     <AuthShell
       title="Create your account"
-      subtitle="Everything is stored locally. This is just how the app keeps your data separate."
+      subtitle={
+        process.env.TURSO_DATABASE_URL
+          ? "Your data is kept in its own database, isolated from every other account."
+          : "Everything is stored locally. This is just how the app keeps your data separate."
+      }
       footer={
         <p>
           Already have an account?{" "}

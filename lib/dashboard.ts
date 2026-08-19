@@ -33,32 +33,60 @@ import type { User } from "./types";
  * Deliberately a single function rather than a dozen page-level queries: the
  * recurring detector and the forecaster both need the full transaction history,
  * and loading it once keeps a dashboard render to a handful of SQL statements.
+ * All independent queries fire together rather than one-at-a-time — over a
+ * network round trip to a hosted database, that's the difference between one
+ * round trip's worth of latency and a dozen.
  */
-export function getDashboard(user: User, month = currentMonth()) {
+export async function getDashboard(user: User, month = currentMonth()) {
   const userId = user.id;
 
-  const total = countTransactions(userId);
-  const bounds = getDateBounds(userId);
+  const [total, bounds] = await Promise.all([countTransactions(userId), getDateBounds(userId)]);
   if (!total || !bounds) return null;
 
   const from = monthStart(month);
   const to = monthEnd(month);
   const prevMonth = addMonths(month, -1);
+  const prevFrom = monthStart(prevMonth);
+  const prevTo = monthEnd(prevMonth);
 
-  /* ── Core aggregates ─────────────────────────────────────────── */
-  const kpis = getKpis(userId, from, to);
-  const previousKpis = getKpis(userId, monthStart(prevMonth), monthEnd(prevMonth));
-  const history = getMonthlySeries(userId, 24);
-  const categoriesThisMonth = getCategoryTotals(userId, from, to);
-  const categoriesLastMonth = getCategoryTotals(userId, monthStart(prevMonth), monthEnd(prevMonth));
-  const incomeCategories = getCategoryTotals(userId, from, to, "income");
-  const budgets = getBudgetStatus(userId, month);
-  const topMerchants = getTopMerchants(userId, from, to, 8);
-  const daily = getDailySeries(userId, from, to);
-  const weekdays = weekdayProfile(userId, from, to);
+  /* ── Everything independent, in one batch ───────────────────────── */
+  const [
+    kpis,
+    previousKpis,
+    history,
+    categoriesThisMonth,
+    categoriesLastMonth,
+    incomeCategories,
+    budgets,
+    topMerchants,
+    daily,
+    weekdays,
+    transactions,
+    categoryMonthlyMap,
+    uncategorisedRow,
+    recent,
+  ] = await Promise.all([
+    getKpis(userId, from, to),
+    getKpis(userId, prevFrom, prevTo),
+    getMonthlySeries(userId, 24),
+    getCategoryTotals(userId, from, to),
+    getCategoryTotals(userId, prevFrom, prevTo),
+    getCategoryTotals(userId, from, to, "income"),
+    getBudgetStatus(userId, month),
+    getTopMerchants(userId, from, to, 8),
+    getDailySeries(userId, from, to),
+    weekdayProfile(userId, from, to),
+    allTransactions(userId),
+    getCategoryMonthlyMap(userId),
+    get<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM transactions
+        WHERE user_id = ? AND (category = 'Uncategorised' OR confidence < 0.6)`,
+      userId,
+    ),
+    queryTransactions(userId, { limit: 8, sort: "date_desc" }),
+  ]);
 
-  /* ── Model-driven views over the full history ────────────────── */
-  const transactions = allTransactions(userId);
+  /* ── Model-driven views over the full history (pure JS, no I/O) ──── */
   const recurring = detectRecurring(transactions);
   const anomalies = detectAnomalies(transactions);
   const risesFound = priceIncreases(recurring, transactions);
@@ -72,7 +100,7 @@ export function getDashboard(user: User, month = currentMonth()) {
   const closedHistory = history.filter((h) => h.month < nowMonth);
   const forecast = forecastSpending({
     history: closedHistory.length >= 2 ? closedHistory : history,
-    byCategory: getCategoryMonthlyMap(userId),
+    byCategory: categoryMonthlyMap,
     commitmentMinor: commitment,
   });
 
@@ -95,13 +123,7 @@ export function getDashboard(user: User, month = currentMonth()) {
     ? projectCurrentMonth(kpis.spendMinor, fixedPaid, dayOfMonth, daysInMonth(month), typical)
     : kpis.spendMinor;
 
-  /* ── Data quality ────────────────────────────────────────────── */
-  const uncategorised =
-    get<{ n: number }>(
-      `SELECT COUNT(*) AS n FROM transactions
-        WHERE user_id = ? AND (category = 'Uncategorised' OR confidence < 0.6)`,
-      userId,
-    )?.n ?? 0;
+  const uncategorised = uncategorisedRow?.n ?? 0;
 
   /* ── Narrative layer ─────────────────────────────────────────── */
   const insights = buildInsights({
@@ -122,8 +144,6 @@ export function getDashboard(user: User, month = currentMonth()) {
     weekdayProfile: weekdays,
     isCurrent,
   });
-
-  const recent = queryTransactions(userId, { limit: 8, sort: "date_desc" });
 
   return {
     month,
@@ -155,11 +175,11 @@ export function getDashboard(user: User, month = currentMonth()) {
   };
 }
 
-export type DashboardData = NonNullable<ReturnType<typeof getDashboard>>;
+export type DashboardData = NonNullable<Awaited<ReturnType<typeof getDashboard>>>;
 
 /** The months that actually contain data, newest first — for the month picker. */
-export function availableMonths(userId: number): string[] {
-  const bounds = getDateBounds(userId);
+export async function availableMonths(userId: number): Promise<string[]> {
+  const bounds = await getDateBounds(userId);
   if (!bounds) return [currentMonth()];
 
   const out: string[] = [];

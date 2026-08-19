@@ -16,15 +16,15 @@ import type { ParsedRow } from "./csv";
 /* ---------------------------------------------------------------------- */
 
 /** Idempotently give a new user their category taxonomy and a default account. */
-export function ensureUserSetup(userId: number): Account {
-  return transact(() => {
-    const existing = get<{ n: number }>(
+export async function ensureUserSetup(userId: number): Promise<Account> {
+  return transact(async (t) => {
+    const existing = await t.get<{ n: number }>(
       "SELECT COUNT(*) AS n FROM categories WHERE user_id = ?",
       userId,
     );
     if (!existing?.n) {
-      DEFAULT_CATEGORIES.forEach((c, i) => {
-        run(
+      for (const [i, c] of DEFAULT_CATEGORIES.entries()) {
+        await t.run(
           `INSERT OR IGNORE INTO categories (user_id, name, icon, color, kind, sort)
            VALUES (?, ?, ?, ?, ?, ?)`,
           userId,
@@ -34,45 +34,45 @@ export function ensureUserSetup(userId: number): Account {
           c.kind,
           i,
         );
-      });
+      }
     }
 
-    let account = get<Account>(
+    let account = await t.get<Account>(
       "SELECT * FROM accounts WHERE user_id = ? ORDER BY id ASC LIMIT 1",
       userId,
     );
     if (!account) {
-      const { lastInsertRowid } = run(
+      const { lastInsertRowid } = await t.run(
         "INSERT INTO accounts (user_id, name, institution, type) VALUES (?, ?, ?, ?)",
         userId,
         "Main Account",
         null,
         "current",
       );
-      account = get<Account>("SELECT * FROM accounts WHERE id = ?", lastInsertRowid)!;
+      account = (await t.get<Account>("SELECT * FROM accounts WHERE id = ?", lastInsertRowid))!;
     }
     return account;
   });
 }
 
-export function listAccounts(userId: number): Account[] {
+export function listAccounts(userId: number): Promise<Account[]> {
   return all<Account>("SELECT * FROM accounts WHERE user_id = ? ORDER BY id ASC", userId);
 }
 
-export function createAccount(
+export async function createAccount(
   userId: number,
   name: string,
   type: Account["type"] = "current",
   institution?: string,
-): Account {
-  const { lastInsertRowid } = run(
+): Promise<Account> {
+  const { lastInsertRowid } = await run(
     "INSERT INTO accounts (user_id, name, institution, type) VALUES (?, ?, ?, ?)",
     userId,
     name.trim() || "Account",
     institution?.trim() || null,
     type,
   );
-  return get<Account>("SELECT * FROM accounts WHERE id = ?", lastInsertRowid)!;
+  return (await get<Account>("SELECT * FROM accounts WHERE id = ?", lastInsertRowid))!;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -85,13 +85,13 @@ export function createAccount(
  * high-confidence automatic labels are included as weak supervision once there
  * are enough of them to be worth the risk of reinforcing a mistake.
  */
-export function buildCategorizer(userId: number): Categorizer {
-  const rules = all<UserRule>(
+export async function buildCategorizer(userId: number): Promise<Categorizer> {
+  const rules = await all<UserRule>(
     "SELECT pattern, category, priority FROM rules WHERE user_id = ? ORDER BY priority ASC",
     userId,
   );
 
-  const confirmed = all<TrainingSample>(
+  const confirmed = await all<TrainingSample>(
     `SELECT description, amount_minor, date, category
        FROM transactions
       WHERE user_id = ? AND is_confirmed = 1 AND category != 'Uncategorised'`,
@@ -101,7 +101,7 @@ export function buildCategorizer(userId: number): Categorizer {
   // Self-training: only once the user has given us a real signal of their own.
   const auto =
     confirmed.length >= 15
-      ? all<TrainingSample>(
+      ? await all<TrainingSample>(
           `SELECT description, amount_minor, date, category
              FROM transactions
             WHERE user_id = ? AND is_confirmed = 0 AND confidence >= 0.9
@@ -145,24 +145,24 @@ export interface ImportSummary {
   total: number;
 }
 
-export function importTransactions(
+export async function importTransactions(
   userId: number,
   accountId: number,
   filename: string,
   rows: ParsedRow[],
-): ImportSummary {
-  const categorizer = buildCategorizer(userId);
+): Promise<ImportSummary> {
+  const categorizer = await buildCategorizer(userId);
+  const knownCategories = await knownCategorySet(userId);
 
   // One query rather than one per row — imports are frequently thousands long.
   const existing = new Set(
-    all<{ fingerprint: string }>(
-      "SELECT fingerprint FROM transactions WHERE user_id = ?",
-      userId,
+    (
+      await all<{ fingerprint: string }>("SELECT fingerprint FROM transactions WHERE user_id = ?", userId)
     ).map((r) => r.fingerprint),
   );
 
-  return transact(() => {
-    const { lastInsertRowid: batchId } = run(
+  return transact(async (t) => {
+    const { lastInsertRowid: batchId } = await t.run(
       "INSERT INTO import_batches (user_id, filename, row_count) VALUES (?, ?, ?)",
       userId,
       filename.slice(0, 200),
@@ -196,7 +196,7 @@ export function importTransactions(
       const prediction = categorizer.classify(row.description, row.amountMinor, row.date);
 
       // A category column in the source file is a stronger signal than our guess.
-      const category = row.suggestedCategory && isKnownCategory(userId, row.suggestedCategory)
+      const category = row.suggestedCategory && knownCategories.has(row.suggestedCategory)
         ? row.suggestedCategory
         : prediction.category;
       const confidence = row.suggestedCategory && category === row.suggestedCategory ? 0.95 : prediction.confidence;
@@ -204,7 +204,7 @@ export function importTransactions(
       const merchant = merchantKey(row.description);
       const isTransfer = categoryIsTransfer(category) ? 1 : 0;
 
-      run(
+      await t.run(
         `INSERT INTO transactions
            (user_id, account_id, date, description, merchant, amount_minor,
             category, confidence, is_confirmed, is_transfer, fingerprint, batch_id)
@@ -228,7 +228,7 @@ export function importTransactions(
       else needsReview++;
     }
 
-    run(
+    await t.run(
       "UPDATE import_batches SET imported_count = ?, duplicate_count = ? WHERE id = ?",
       imported,
       duplicates,
@@ -245,17 +245,14 @@ function categoryIsTransfer(name: string): boolean {
 }
 
 const knownCategoryCache = new Map<number, Set<string>>();
-function isKnownCategory(userId: number, name: string): boolean {
+async function knownCategorySet(userId: number): Promise<Set<string>> {
   let set = knownCategoryCache.get(userId);
   if (!set) {
-    set = new Set(
-      all<{ name: string }>("SELECT name FROM categories WHERE user_id = ?", userId).map(
-        (r) => r.name,
-      ),
-    );
+    const rows = await all<{ name: string }>("SELECT name FROM categories WHERE user_id = ?", userId);
+    set = new Set(rows.map((r) => r.name));
     knownCategoryCache.set(userId, set);
   }
-  return set.has(name);
+  return set;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -267,8 +264,8 @@ function isKnownCategory(userId: number, name: string): boolean {
  * the system: it is both an immediate correction and a labelled training
  * example that improves every future classification.
  */
-export function setCategory(userId: number, transactionId: number, category: string): void {
-  run(
+export function setCategory(userId: number, transactionId: number, category: string): Promise<unknown> {
+  return run(
     `UPDATE transactions
         SET category = ?, confidence = 1.0, is_confirmed = 1, is_transfer = ?
       WHERE user_id = ? AND id = ?`,
@@ -280,12 +277,12 @@ export function setCategory(userId: number, transactionId: number, category: str
 }
 
 /** Apply a category to every transaction from the same merchant. */
-export function setCategoryForMerchant(
+export async function setCategoryForMerchant(
   userId: number,
   merchant: string,
   category: string,
-): number {
-  const { changes } = run(
+): Promise<number> {
+  const { changes } = await run(
     `UPDATE transactions
         SET category = ?, confidence = 1.0, is_confirmed = 1, is_transfer = ?
       WHERE user_id = ? AND merchant = ?`,
@@ -297,8 +294,8 @@ export function setCategoryForMerchant(
   return changes;
 }
 
-export function setTransferFlag(userId: number, transactionId: number, isTransfer: boolean): void {
-  run(
+export function setTransferFlag(userId: number, transactionId: number, isTransfer: boolean): Promise<unknown> {
+  return run(
     "UPDATE transactions SET is_transfer = ? WHERE user_id = ? AND id = ?",
     isTransfer ? 1 : 0,
     userId,
@@ -306,8 +303,8 @@ export function setTransferFlag(userId: number, transactionId: number, isTransfe
   );
 }
 
-export function setNotes(userId: number, transactionId: number, notes: string): void {
-  run(
+export function setNotes(userId: number, transactionId: number, notes: string): Promise<unknown> {
+  return run(
     "UPDATE transactions SET notes = ? WHERE user_id = ? AND id = ?",
     notes.slice(0, 500) || null,
     userId,
@@ -315,9 +312,9 @@ export function setNotes(userId: number, transactionId: number, notes: string): 
   );
 }
 
-export function deleteTransactions(userId: number, ids: number[]): number {
+export async function deleteTransactions(userId: number, ids: number[]): Promise<number> {
   if (!ids.length) return 0;
-  const { changes } = run(
+  const { changes } = await run(
     `DELETE FROM transactions WHERE user_id = ? AND id IN (${placeholders(ids.length)})`,
     userId,
     ...ids,
@@ -330,9 +327,9 @@ export function deleteTransactions(userId: number, ids: number[]): number {
  * Called after a batch of corrections, so the lessons learned from ten
  * relabelled rows immediately propagate to the other nine hundred.
  */
-export function recategorizeAll(userId: number): { updated: number; scanned: number } {
-  const categorizer = buildCategorizer(userId);
-  const rows = all<Transaction>(
+export async function recategorizeAll(userId: number): Promise<{ updated: number; scanned: number }> {
+  const categorizer = await buildCategorizer(userId);
+  const rows = await all<Transaction>(
     `SELECT id, description, amount_minor, date, category
        FROM transactions
       WHERE user_id = ? AND is_confirmed = 0`,
@@ -340,20 +337,20 @@ export function recategorizeAll(userId: number): { updated: number; scanned: num
   );
 
   let updated = 0;
-  transact(() => {
-    for (const t of rows) {
-      const p = categorizer.classify(t.description, t.amount_minor, t.date);
-      if (p.category !== t.category) {
-        run(
+  await transact(async (t) => {
+    for (const tx of rows) {
+      const p = categorizer.classify(tx.description, tx.amount_minor, tx.date);
+      if (p.category !== tx.category) {
+        await t.run(
           `UPDATE transactions SET category = ?, confidence = ?, is_transfer = ? WHERE id = ?`,
           p.category,
           p.confidence,
           categoryIsTransfer(p.category) ? 1 : 0,
-          t.id,
+          tx.id,
         );
         updated++;
       } else {
-        run("UPDATE transactions SET confidence = ? WHERE id = ?", p.confidence, t.id);
+        await t.run("UPDATE transactions SET confidence = ? WHERE id = ?", p.confidence, tx.id);
       }
     }
   });
@@ -362,14 +359,14 @@ export function recategorizeAll(userId: number): { updated: number; scanned: num
 }
 
 /** Backfill merchant keys — used after changing the normalisation rules. */
-export function rebuildMerchants(userId: number): number {
-  const rows = all<{ id: number; description: string }>(
+export async function rebuildMerchants(userId: number): Promise<number> {
+  const rows = await all<{ id: number; description: string }>(
     "SELECT id, description FROM transactions WHERE user_id = ?",
     userId,
   );
-  transact(() => {
+  await transact(async (t) => {
     for (const r of rows) {
-      run("UPDATE transactions SET merchant = ? WHERE id = ?", merchantKey(r.description), r.id);
+      await t.run("UPDATE transactions SET merchant = ? WHERE id = ?", merchantKey(r.description), r.id);
     }
   });
   return rows.length;
@@ -389,7 +386,7 @@ export function listRules(userId: number) {
 export function createRule(userId: number, pattern: string, category: string, priority = 100) {
   const clean = pattern.trim().toLowerCase();
   if (!clean) throw new Error("A rule needs something to match on.");
-  run(
+  return run(
     "INSERT INTO rules (user_id, pattern, category, priority) VALUES (?, ?, ?, ?)",
     userId,
     clean,
@@ -399,7 +396,7 @@ export function createRule(userId: number, pattern: string, category: string, pr
 }
 
 export function deleteRule(userId: number, id: number) {
-  run("DELETE FROM rules WHERE user_id = ? AND id = ?", userId, id);
+  return run("DELETE FROM rules WHERE user_id = ? AND id = ?", userId, id);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -408,10 +405,9 @@ export function deleteRule(userId: number, id: number) {
 
 export function setBudget(userId: number, category: string, amountMinor: number) {
   if (amountMinor <= 0) {
-    run("DELETE FROM budgets WHERE user_id = ? AND category = ?", userId, category);
-    return;
+    return run("DELETE FROM budgets WHERE user_id = ? AND category = ?", userId, category);
   }
-  run(
+  return run(
     `INSERT INTO budgets (user_id, category, amount_minor) VALUES (?, ?, ?)
      ON CONFLICT(user_id, category) DO UPDATE SET amount_minor = excluded.amount_minor`,
     userId,
@@ -432,8 +428,8 @@ export function listBudgets(userId: number) {
  * of recent months, rounded up to a memorable number. Median rather than mean
  * so one blow-out month doesn't set an over-generous target.
  */
-export function suggestBudgets(userId: number, months = 6) {
-  const rows = all<{ category: string; month: string; total: number }>(
+export async function suggestBudgets(userId: number, months = 6) {
+  const rows = await all<{ category: string; month: string; total: number }>(
     `SELECT category, substr(date,1,7) AS month, SUM(-amount_minor) AS total
        FROM transactions
       WHERE user_id = ? AND amount_minor < 0 AND is_transfer = 0
@@ -483,23 +479,23 @@ function roundToNice(minor: number): number {
 /* Manual entry & housekeeping                                             */
 /* ---------------------------------------------------------------------- */
 
-export function addManualTransaction(
+export async function addManualTransaction(
   userId: number,
   accountId: number,
   input: { date: string; description: string; amountMinor: number; category?: string },
-): number {
-  const categorizer = buildCategorizer(userId);
+): Promise<number> {
+  const categorizer = await buildCategorizer(userId);
   const category =
     input.category ?? categorizer.classify(input.description, input.amountMinor, input.date).category;
 
   const base = fingerprintBase(accountId, input);
-  const existing = all<{ fingerprint: string }>(
+  const existing = await all<{ fingerprint: string }>(
     "SELECT fingerprint FROM transactions WHERE user_id = ? AND fingerprint LIKE ?",
     userId,
     `${base}:%`,
   );
 
-  const { lastInsertRowid } = run(
+  const { lastInsertRowid } = await run(
     `INSERT INTO transactions
        (user_id, account_id, date, description, merchant, amount_minor,
         category, confidence, is_confirmed, is_transfer, fingerprint)
@@ -534,22 +530,22 @@ export function listBatches(userId: number) {
 }
 
 /** Undo an import wholesale — vital trust feature for a data-import product. */
-export function deleteBatch(userId: number, batchId: number): number {
-  const { changes } = run(
+export async function deleteBatch(userId: number, batchId: number): Promise<number> {
+  const { changes } = await run(
     "DELETE FROM transactions WHERE user_id = ? AND batch_id = ?",
     userId,
     batchId,
   );
-  run("DELETE FROM import_batches WHERE user_id = ? AND id = ?", userId, batchId);
+  await run("DELETE FROM import_batches WHERE user_id = ? AND id = ?", userId, batchId);
   return changes;
 }
 
-export function wipeUserData(userId: number): void {
-  transact(() => {
-    run("DELETE FROM transactions WHERE user_id = ?", userId);
-    run("DELETE FROM import_batches WHERE user_id = ?", userId);
-    run("DELETE FROM budgets WHERE user_id = ?", userId);
-    run("DELETE FROM rules WHERE user_id = ?", userId);
+export async function wipeUserData(userId: number): Promise<void> {
+  await transact(async (t) => {
+    await t.run("DELETE FROM transactions WHERE user_id = ?", userId);
+    await t.run("DELETE FROM import_batches WHERE user_id = ?", userId);
+    await t.run("DELETE FROM budgets WHERE user_id = ?", userId);
+    await t.run("DELETE FROM rules WHERE user_id = ?", userId);
   });
   knownCategoryCache.delete(userId);
 }

@@ -49,7 +49,7 @@ export async function GET(request: Request) {
 
   // Page through so a large history doesn't need a single huge query.
   for (let offset = 0; ; offset += 500) {
-    const { rows: page } = queryTransactions(user.id, { ...filters, offset });
+    const { rows: page } = await queryTransactions(user.id, { ...filters, offset });
     for (const t of page) {
       rows.push([
         t.date,

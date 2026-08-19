@@ -35,7 +35,7 @@ export async function signUp(_prev: FormState, formData: FormData): Promise<Form
 
   let userId: number;
   try {
-    const user = createUser({
+    const user = await createUser({
       email,
       password,
       name,
@@ -49,8 +49,8 @@ export async function signUp(_prev: FormState, formData: FormData): Promise<Form
     };
   }
 
-  const account = ensureUserSetup(userId);
-  if (wantsDemo) seedDemoData(userId, account.id);
+  const account = await ensureUserSetup(userId);
+  if (wantsDemo) await seedDemoData(userId, account.id);
 
   await startSession(userId);
   redirect("/app");
@@ -62,10 +62,10 @@ export async function signIn(_prev: FormState, formData: FormData): Promise<Form
 
   if (!email || !password) return { error: "Enter your email and password." };
 
-  const user = authenticate(email, password);
+  const user = await authenticate(email, password);
   if (!user) return { error: "That email and password don't match an account." };
 
-  ensureUserSetup(user.id);
+  await ensureUserSetup(user.id);
   await startSession(user.id);
   redirect("/app");
 }
@@ -82,7 +82,7 @@ export async function signOut(): Promise<void> {
  */
 export async function startDemo(): Promise<void> {
   const suffix = randomBytes(4).toString("hex");
-  const user = createUser({
+  const user = await createUser({
     email: `demo-${suffix}@fiscora.local`,
     password: randomBytes(18).toString("base64url"),
     name: "Demo User",
@@ -90,8 +90,8 @@ export async function startDemo(): Promise<void> {
     isDemo: true,
   });
 
-  const account = ensureUserSetup(user.id);
-  seedDemoData(user.id, account.id);
+  const account = await ensureUserSetup(user.id);
+  await seedDemoData(user.id, account.id);
 
   await startSession(user.id);
   redirect("/app");

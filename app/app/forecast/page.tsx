@@ -29,7 +29,7 @@ const MODEL_NOTES: Record<string, string> = {
 
 export default async function ForecastPage() {
   const user = await requireUser();
-  const data = getDashboard(user);
+  const data = await getDashboard(user);
   const cur = user.currency;
 
   if (!data || !data.forecast) {

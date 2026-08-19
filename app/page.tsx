@@ -94,6 +94,8 @@ const STEPS = [
   },
 ];
 
+const isRemoteDb = !!process.env.TURSO_DATABASE_URL;
+
 export default async function LandingPage() {
   const user = await currentUser();
   if (user) redirect("/app");
@@ -136,7 +138,7 @@ export default async function LandingPage() {
                   style={{ background: "var(--viz-good)" }}
                   aria-hidden="true"
                 />
-                Free and open · runs on your own machine
+                Free and open · {isRemoteDb ? "self-hosted, your own database" : "runs on your own machine"}
               </span>
 
               <h1 className="mt-5 text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-fg sm:text-5xl lg:text-[3.4rem]">
@@ -227,7 +229,8 @@ export default async function LandingPage() {
             </h2>
             <p className="mt-3 text-base leading-relaxed text-muted">
               No ads, no upsells, no selling your transaction history to anybody. Every feature
-              below runs locally against a SQLite file you own.
+              below runs against a SQLite database you own
+              {isRemoteDb ? ", hosted under your own account" : " on this machine"}.
             </p>
           </div>
 
@@ -371,15 +374,26 @@ export default async function LandingPage() {
             🔒
           </div>
           <h2 className="text-3xl font-semibold tracking-tight text-fg">
-            Your statements never leave your machine
+            {isRemoteDb ? "Your data stays in a database only you control" : "Your statements never leave your machine"}
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-muted">
-            Fiscora stores everything in a single SQLite file in the project&apos;s{" "}
-            <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[0.8125rem]">
-              data/
-            </code>{" "}
-            directory. There is no analytics script, no telemetry, no external API call and no
-            hosted backend. Delete the file and the data is genuinely gone.
+            {isRemoteDb ? (
+              <>
+                Fiscora stores everything in a SQLite database you host yourself, reachable only
+                with your own access token. There is no analytics script, no telemetry and no
+                third-party service in the loop — every calculation runs on this server, not a
+                hosted API. Delete the database and the data is genuinely gone.
+              </>
+            ) : (
+              <>
+                Fiscora stores everything in a single SQLite file in the project&apos;s{" "}
+                <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[0.8125rem]">
+                  data/
+                </code>{" "}
+                directory. There is no analytics script, no telemetry, no external API call and no
+                hosted backend. Delete the file and the data is genuinely gone.
+              </>
+            )}
           </p>
 
           <div className="mt-10 flex flex-wrap justify-center gap-3">

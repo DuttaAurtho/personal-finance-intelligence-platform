@@ -1,40 +1,66 @@
-import { DatabaseSync } from "node:sqlite";
+import { createClient, type Client, type InValue, type ResultSet } from "@libsql/client";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
 /**
- * Storage layer.
+ * Storage layer, backed by libSQL.
  *
- * Uses `node:sqlite`, built into Node 22.5+ — a real relational database with
- * zero dependencies, zero install step and zero hosting cost. The file lives
- * under ./data and never leaves the machine, which is the whole privacy pitch
- * of the product.
+ * Locally this talks to a plain file (`file:./data/fiscora.db`) with zero
+ * setup and zero cost — the original "runs on your machine" design. Set
+ * TURSO_DATABASE_URL / TURSO_AUTH_TOKEN (a free hosted libSQL database from
+ * turso.tech) and the exact same code talks to that instead, which is what
+ * makes this deployable to a serverless host like Vercel: those platforms
+ * give functions a read-only filesystem, so a local SQLite *file* can't live
+ * there, but a libSQL *client* can still reach a real database over the network.
  *
- * The connection is cached on globalThis so Next's dev-mode module reloading
- * doesn't open a new handle on every edit.
+ * The client API is promise-based (it's a network protocol under the hood,
+ * even for the local file case), so every query in this app is async —
+ * unlike the node:sqlite version this replaced.
  */
 
-const DB_PATH = process.env.FISCORA_DB ?? path.join(process.cwd(), "data", "fiscora.db");
+const isRemote = !!process.env.TURSO_DATABASE_URL;
+const LOCAL_DB_PATH = process.env.FISCORA_DB ?? path.join(process.cwd(), "data", "fiscora.db");
 
 declare global {
   // eslint-disable-next-line no-var
-  var __fiscoraDb: DatabaseSync | undefined;
+  var __fiscoraClient: Client | undefined;
+  // eslint-disable-next-line no-var
+  var __fiscoraReady: Promise<void> | undefined;
 }
 
-function connect(): DatabaseSync {
-  mkdirSync(path.dirname(DB_PATH), { recursive: true });
-  const db = new DatabaseSync(DB_PATH);
-  // WAL keeps reads fast while an import writes; foreign keys must be asked for.
-  db.exec("PRAGMA journal_mode = WAL");
-  db.exec("PRAGMA foreign_keys = ON");
-  db.exec("PRAGMA busy_timeout = 5000");
-  migrate(db);
-  return db;
+function createFiscoraClient(): Client {
+  if (isRemote) {
+    return createClient({
+      url: process.env.TURSO_DATABASE_URL!,
+      authToken: process.env.TURSO_AUTH_TOKEN,
+      intMode: "number",
+    });
+  }
+  mkdirSync(path.dirname(LOCAL_DB_PATH), { recursive: true });
+  return createClient({ url: `file:${LOCAL_DB_PATH}`, intMode: "number" });
 }
 
-export function getDb(): DatabaseSync {
-  if (!globalThis.__fiscoraDb) globalThis.__fiscoraDb = connect();
-  return globalThis.__fiscoraDb;
+function client(): Client {
+  if (!globalThis.__fiscoraClient) globalThis.__fiscoraClient = createFiscoraClient();
+  return globalThis.__fiscoraClient;
+}
+
+/** Runs once per process: pragmas + schema migration. Every entry point awaits this first. */
+function ready(): Promise<void> {
+  if (!globalThis.__fiscoraReady) globalThis.__fiscoraReady = init();
+  return globalThis.__fiscoraReady;
+}
+
+async function init(): Promise<void> {
+  const c = client();
+  if (!isRemote) {
+    // WAL and a busy timeout only make sense against a local file; a remote
+    // libSQL server manages its own concurrency.
+    await c.execute("PRAGMA journal_mode = WAL");
+    await c.execute("PRAGMA busy_timeout = 5000");
+  }
+  await c.execute("PRAGMA foreign_keys = ON");
+  await c.executeMultiple(SCHEMA);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -135,70 +161,94 @@ CREATE TABLE IF NOT EXISTS rules (
 CREATE INDEX IF NOT EXISTS idx_rules_user ON rules(user_id);
 `;
 
-function migrate(db: DatabaseSync) {
-  db.exec(SCHEMA);
-}
-
 /* ---------------------------------------------------------------------- */
 /* Query helpers                                                           */
 /* ---------------------------------------------------------------------- */
 
-export type SqlValue = string | number | bigint | Uint8Array | null;
-
 /**
- * SQLite rejects booleans and `undefined`. Normalise once here so callers can
- * pass ordinary JS values without every call site remembering the rule.
+ * SQLite rejects `undefined`; booleans have no native type either. Normalise
+ * once here so callers can pass ordinary JS values without every call site
+ * remembering the rule.
  */
-function normalise(params: unknown[]): SqlValue[] {
+function normalise(params: unknown[]): InValue[] {
   return params.map((p) => {
     if (p === undefined || p === null) return null;
     if (typeof p === "boolean") return p ? 1 : 0;
     if (typeof p === "number") return Number.isFinite(p) ? p : 0;
-    if (typeof p === "string" || typeof p === "bigint" || p instanceof Uint8Array) return p;
+    if (typeof p === "string" || typeof p === "bigint" || p instanceof Uint8Array || p instanceof ArrayBuffer)
+      return p;
     return String(p);
   });
 }
 
 /**
- * node:sqlite returns row objects created with `Object.create(null)` — no
- * prototype at all. That's invisible almost everywhere, but React's Server
- * Component serializer explicitly rejects null-prototype objects when a
- * server value is passed to a Client Component, so every row is normalised
- * into a plain object here, once, rather than at every call site that
- * happens to feed a client component.
+ * Row values arrive column-order-indexed; rebuild plain `{column: value}`
+ * objects explicitly rather than trusting whatever shape the driver's Row
+ * type happens to be — the node:sqlite predecessor of this file returned
+ * null-prototype rows that React's Server Component serializer silently
+ * rejected, so this project doesn't pass driver row objects to callers unseen.
  */
-function toPlainObject<T>(row: unknown): T {
-  return { ...(row as object) } as T;
+function toPlainRows<T>(rs: ResultSet): T[] {
+  const cols = rs.columns;
+  return rs.rows.map((row) => {
+    const obj: Record<string, unknown> = {};
+    for (let i = 0; i < cols.length; i++) obj[cols[i]] = row[i];
+    return obj as T;
+  });
 }
 
-export function all<T = Record<string, unknown>>(sql: string, ...params: unknown[]): T[] {
-  return (getDb().prepare(sql).all(...normalise(params)) as unknown[]).map(toPlainObject<T>);
+type Executor = (sql: string, args: InValue[]) => Promise<ResultSet>;
+
+function makeQueries(exec: Executor) {
+  return {
+    async all<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<T[]> {
+      const rs = await exec(sql, normalise(params));
+      return toPlainRows<T>(rs);
+    },
+    async get<T = Record<string, unknown>>(sql: string, ...params: unknown[]): Promise<T | undefined> {
+      const rs = await exec(sql, normalise(params));
+      return rs.rows.length ? toPlainRows<T>(rs)[0] : undefined;
+    },
+    async run(
+      sql: string,
+      ...params: unknown[]
+    ): Promise<{ changes: number; lastInsertRowid: number }> {
+      const rs = await exec(sql, normalise(params));
+      return {
+        changes: Number(rs.rowsAffected ?? 0),
+        lastInsertRowid: rs.lastInsertRowid === undefined ? 0 : Number(rs.lastInsertRowid),
+      };
+    },
+  };
 }
 
-export function get<T = Record<string, unknown>>(sql: string, ...params: unknown[]): T | undefined {
-  const row = getDb().prepare(sql).get(...normalise(params));
-  return row === undefined ? undefined : toPlainObject<T>(row);
-}
+const rootQueries = makeQueries(async (sql, args) => {
+  await ready();
+  return client().execute({ sql, args });
+});
 
-export function run(sql: string, ...params: unknown[]): { changes: number; lastInsertRowid: number } {
-  const r = getDb().prepare(sql).run(...normalise(params));
-  return { changes: Number(r.changes), lastInsertRowid: Number(r.lastInsertRowid) };
-}
+export const all = rootQueries.all;
+export const get = rootQueries.get;
+export const run = rootQueries.run;
 
-/** Run `fn` inside a transaction, rolling back if it throws. */
-export function transact<T>(fn: () => T): T {
-  const db = getDb();
-  db.exec("BEGIN");
+/**
+ * Runs `fn` inside a real database transaction, rolling back on any throw.
+ * The callback receives its own `{ all, get, run }` bound to the transaction
+ * — use those, not the module-level ones, for every query that must be part
+ * of the atomic unit.
+ */
+export async function transact<T>(
+  fn: (t: { all: typeof all; get: typeof get; run: typeof run }) => Promise<T>,
+): Promise<T> {
+  await ready();
+  const tx = await client().transaction("write");
+  const scoped = makeQueries((sql, args) => tx.execute({ sql, args }));
   try {
-    const result = fn();
-    db.exec("COMMIT");
+    const result = await fn(scoped);
+    await tx.commit();
     return result;
   } catch (err) {
-    try {
-      db.exec("ROLLBACK");
-    } catch {
-      /* the transaction was already unwound */
-    }
+    await tx.rollback();
     throw err;
   }
 }
@@ -206,4 +256,11 @@ export function transact<T>(fn: () => T): T {
 /** Build `IN (?,?,?)` placeholders for a list of ids. */
 export function placeholders(n: number): string {
   return Array.from({ length: n }, () => "?").join(",");
+}
+
+/** Closes the connection — used by scripts and tests that need a clean exit. */
+export function closeDb(): void {
+  globalThis.__fiscoraClient?.close();
+  globalThis.__fiscoraClient = undefined;
+  globalThis.__fiscoraReady = undefined;
 }

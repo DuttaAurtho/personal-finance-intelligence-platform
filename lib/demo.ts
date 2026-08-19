@@ -256,14 +256,15 @@ export function generateDemoTransactions(months = 24, seed = 20260318): ParsedRo
 }
 
 /** Populate a fresh demo account and give it sensible budgets. */
-export function seedDemoData(userId: number, accountId: number, months = 24) {
+export async function seedDemoData(userId: number, accountId: number, months = 24) {
   const rows = generateDemoTransactions(months);
-  const summary = importTransactions(userId, accountId, "demo-statement.csv", rows);
+  const summary = await importTransactions(userId, accountId, "demo-statement.csv", rows);
 
   // Budgets derived from the generated history, so they're realistic and the
   // budget page has something meaningful to show immediately.
-  for (const s of suggestBudgets(userId, 6).slice(0, 9)) {
-    setBudget(userId, s.category, s.amountMinor);
+  const suggestions = await suggestBudgets(userId, 6);
+  for (const s of suggestions.slice(0, 9)) {
+    await setBudget(userId, s.category, s.amountMinor);
   }
 
   return summary;

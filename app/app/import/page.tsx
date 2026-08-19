@@ -29,8 +29,7 @@ const BANK_TIPS = [
 
 export default async function ImportPage() {
   const user = await requireUser();
-  const accounts = listAccounts(user.id);
-  const batches = listBatches(user.id);
+  const [accounts, batches] = await Promise.all([listAccounts(user.id), listBatches(user.id)]);
 
   return (
     <div className="space-y-6">

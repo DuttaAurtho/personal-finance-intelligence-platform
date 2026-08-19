@@ -64,12 +64,12 @@ export interface CreateUserInput {
   isDemo?: boolean;
 }
 
-export function createUser(input: CreateUserInput): User {
+export async function createUser(input: CreateUserInput): Promise<User> {
   const email = normaliseEmail(input.email);
-  const existing = get<{ id: number }>("SELECT id FROM users WHERE email = ?", email);
+  const existing = await get<{ id: number }>("SELECT id FROM users WHERE email = ?", email);
   if (existing) throw new Error("An account with that email already exists.");
 
-  const { lastInsertRowid } = run(
+  const { lastInsertRowid } = await run(
     `INSERT INTO users (email, name, password_hash, currency, is_demo)
      VALUES (?, ?, ?, ?, ?)`,
     email,
@@ -79,11 +79,11 @@ export function createUser(input: CreateUserInput): User {
     input.isDemo ? 1 : 0,
   );
 
-  return get<User>("SELECT * FROM users WHERE id = ?", lastInsertRowid)!;
+  return (await get<User>("SELECT * FROM users WHERE id = ?", lastInsertRowid))!;
 }
 
-export function authenticate(email: string, password: string): User | null {
-  const row = get<User & { password_hash: string }>(
+export async function authenticate(email: string, password: string): Promise<User | null> {
+  const row = await get<User & { password_hash: string }>(
     "SELECT * FROM users WHERE email = ?",
     normaliseEmail(email),
   );
@@ -96,7 +96,7 @@ export function authenticate(email: string, password: string): User | null {
   return verifyPassword(password, row.password_hash) ? row : null;
 }
 
-export function getUserById(id: number): User | undefined {
+export function getUserById(id: number): Promise<User | undefined> {
   return get<User>("SELECT * FROM users WHERE id = ?", id);
 }
 
@@ -108,8 +108,8 @@ export async function startSession(userId: number): Promise<void> {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = Date.now() + SESSION_DAYS * 86_400_000;
 
-  run("INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)", token, userId, expiresAt);
-  purgeExpired();
+  await run("INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)", token, userId, expiresAt);
+  await purgeExpired();
 
   const store = await cookies();
   store.set(COOKIE, token, {
@@ -124,7 +124,7 @@ export async function startSession(userId: number): Promise<void> {
 export async function endSession(): Promise<void> {
   const store = await cookies();
   const token = store.get(COOKIE)?.value;
-  if (token) run("DELETE FROM sessions WHERE id = ?", token);
+  if (token) await run("DELETE FROM sessions WHERE id = ?", token);
   store.delete(COOKIE);
 }
 
@@ -134,7 +134,7 @@ export async function currentUser(): Promise<User | null> {
   const token = store.get(COOKIE)?.value;
   if (!token) return null;
 
-  const row = get<User & { expires_at: number }>(
+  const row = await get<User & { expires_at: number }>(
     `SELECT u.*, s.expires_at
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.id = ?`,
@@ -143,7 +143,7 @@ export async function currentUser(): Promise<User | null> {
   if (!row) return null;
 
   if (row.expires_at < Date.now()) {
-    run("DELETE FROM sessions WHERE id = ?", token);
+    await run("DELETE FROM sessions WHERE id = ?", token);
     return null;
   }
   return row;
@@ -159,8 +159,8 @@ export async function requireUser(): Promise<User> {
   return user;
 }
 
-function purgeExpired(): void {
-  run("DELETE FROM sessions WHERE expires_at < ?", Date.now());
+function purgeExpired(): Promise<unknown> {
+  return run("DELETE FROM sessions WHERE expires_at < ?", Date.now());
 }
 
 /* ---------------------------------------------------------------------- */

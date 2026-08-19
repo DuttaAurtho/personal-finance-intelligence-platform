@@ -19,20 +19,22 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const user = await requireUser();
 
-  const categories = all<{ name: string; icon: string; color: string; kind: string }>(
-    "SELECT name, icon, color, kind FROM categories WHERE user_id = ? ORDER BY sort ASC",
-    user.id,
-  );
-  const rules = listRules(user.id);
-  const accounts = listAccounts(user.id);
-  const txCount = countTransactions(user.id);
-  const bounds = getDateBounds(user.id);
-
-  const confirmed =
+  const [categories, rules, accounts, txCount, bounds, confirmedRow] = await Promise.all([
+    all<{ name: string; icon: string; color: string; kind: string }>(
+      "SELECT name, icon, color, kind FROM categories WHERE user_id = ? ORDER BY sort ASC",
+      user.id,
+    ),
+    listRules(user.id),
+    listAccounts(user.id),
+    countTransactions(user.id),
+    getDateBounds(user.id),
     get<{ n: number }>(
       "SELECT COUNT(*) AS n FROM transactions WHERE user_id = ? AND is_confirmed = 1",
       user.id,
-    )?.n ?? 0;
+    ),
+  ]);
+  const confirmed = confirmedRow?.n ?? 0;
+  const isRemote = !!process.env.TURSO_DATABASE_URL;
 
   const byKind = {
     expense: categories.filter((c) => c.kind === "expense"),
@@ -106,7 +108,9 @@ export default async function SettingsPage() {
               )}
               <div className="flex items-center justify-between py-2.5">
                 <dt className="text-muted">Stored at</dt>
-                <dd className="font-mono text-xs text-fg">data/fiscora.db</dd>
+                <dd className="font-mono text-xs text-fg">
+                  {isRemote ? "hosted libSQL database" : "data/fiscora.db"}
+                </dd>
               </div>
             </dl>
             <div className="border-t border-line px-5 py-3">
@@ -147,9 +151,9 @@ export default async function SettingsPage() {
           <Card className="px-5 py-4">
             <h2 className="text-sm font-semibold text-fg">Privacy</h2>
             <p className="mt-2 text-[0.8125rem] leading-relaxed text-muted">
-              Everything lives in a single SQLite file on this machine. There is no telemetry, no
-              analytics script and no external API call anywhere in the application — the ML runs
-              in-process. Deleting the file removes the data entirely.
+              {isRemote
+                ? "Your data lives in a SQLite database you host yourself (via Turso), reachable only with your access token. There is no telemetry, no analytics script and no third-party service in the loop — the ML runs entirely on this server, not in an external API."
+                : "Everything lives in a single SQLite file on this machine. There is no telemetry, no analytics script and no external API call anywhere in the application — the ML runs in-process. Deleting the file removes the data entirely."}
             </p>
           </Card>
         </div>

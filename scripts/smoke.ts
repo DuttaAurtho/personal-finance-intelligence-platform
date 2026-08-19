@@ -13,7 +13,7 @@ import path from "node:path";
 const dir = mkdtempSync(path.join(tmpdir(), "fiscora-smoke-"));
 process.env.FISCORA_DB = path.join(dir, "smoke.db");
 
-const { run, get } = await import("../lib/db.ts");
+const { run, get, closeDb } = await import("../lib/db.ts");
 const { ensureUserSetup, importTransactions, suggestBudgets, setBudget, setCategory } =
   await import("../lib/repository.ts");
 const { generateDemoTransactions, demoCsv } = await import("../lib/demo.ts");
@@ -104,18 +104,18 @@ try {
 
   /* ── Import ────────────────────────────────────────────────────── */
   section("Import pipeline");
-  run(
+  await run(
     "INSERT INTO users (email, name, password_hash, currency) VALUES (?, ?, ?, ?)",
     "smoke@test.local",
     "Smoke",
     "x",
     "GBP",
   );
-  const userId = get<{ id: number }>("SELECT id FROM users WHERE email = ?", "smoke@test.local")!.id;
-  const account = ensureUserSetup(userId);
+  const userId = (await get<{ id: number }>("SELECT id FROM users WHERE email = ?", "smoke@test.local"))!.id;
+  const account = await ensureUserSetup(userId);
 
   const rows = generateDemoTransactions(24);
-  const first = importTransactions(userId, account.id, "smoke.csv", rows);
+  const first = await importTransactions(userId, account.id, "smoke.csv", rows);
   check("imports the whole statement", first.imported === rows.length, `${first.imported} of ${rows.length}`);
   check(
     "categorises most rows automatically",
@@ -123,21 +123,21 @@ try {
     `${((first.categorised / first.imported) * 100).toFixed(1)}% auto-categorised`,
   );
 
-  const second = importTransactions(userId, account.id, "smoke.csv", rows);
+  const second = await importTransactions(userId, account.id, "smoke.csv", rows);
   check("re-import creates no duplicates", second.imported === 0, `${second.duplicates} skipped as duplicates`);
 
   /* ── Analytics ─────────────────────────────────────────────────── */
   section("Analytics");
-  const series = getMonthlySeries(userId, 24);
+  const series = await getMonthlySeries(userId, 24);
   check("builds a monthly series", series.length >= 20, `${series.length} months`);
   check("no gaps in the series", series.every((s) => typeof s.spendMinor === "number"));
 
   const month = series[series.length - 2].month;
-  const kpis = getKpis(userId, monthStart(month), monthEnd(month));
+  const kpis = await getKpis(userId, monthStart(month), monthEnd(month));
   check("computes KPIs", kpis.spendMinor > 0 && kpis.incomeMinor > 0, `spend ${money(kpis.spendMinor)}, income ${money(kpis.incomeMinor)}`);
   check("savings rate is plausible", kpis.savingsRate !== null && kpis.savingsRate > -1 && kpis.savingsRate < 1, `${((kpis.savingsRate ?? 0) * 100).toFixed(1)}%`);
 
-  const cats = getCategoryTotals(userId, monthStart(month), monthEnd(month));
+  const cats = await getCategoryTotals(userId, monthStart(month), monthEnd(month));
   check("breaks spending down by category", cats.length >= 5, `${cats.length} categories`);
   check("shares sum to 1", Math.abs(cats.reduce((a, c) => a + c.share, 0) - 1) < 0.001);
   check(
@@ -148,7 +148,7 @@ try {
 
   /* ── Categoriser ───────────────────────────────────────────────── */
   section("Categorisation");
-  const all = allTransactions(userId);
+  const all = await allTransactions(userId);
   const clf = new Categorizer(
     [],
     all.filter((t) => t.category !== "Uncategorised").map((t) => ({
@@ -176,18 +176,18 @@ try {
   }
   check("classifies known merchants", correct === trials.length, `${correct}/${trials.length} correct`);
 
-  const unconfirmed = get<{ n: number }>(
+  const unconfirmed = (await get<{ n: number }>(
     "SELECT COUNT(*) AS n FROM transactions WHERE user_id = ? AND category = 'Uncategorised'",
     userId,
-  )!.n;
+  ))!.n;
   check("few rows left unlabelled", unconfirmed / all.length < 0.1, `${unconfirmed} of ${all.length}`);
 
   // Correcting one row should be recorded as training data
-  setCategory(userId, all[0].id, "Pets");
-  const confirmedRow = get<{ is_confirmed: number; category: string }>(
+  await setCategory(userId, all[0].id, "Pets");
+  const confirmedRow = (await get<{ is_confirmed: number; category: string }>(
     "SELECT is_confirmed, category FROM transactions WHERE id = ?",
     all[0].id,
-  )!;
+  ))!;
   check("a correction is stored as confirmed", confirmedRow.is_confirmed === 1 && confirmedRow.category === "Pets");
 
   /* ── Recurring ─────────────────────────────────────────────────── */
@@ -224,7 +224,7 @@ try {
   const closed = series.filter((s) => s.month < currentMonth());
   const forecast = forecastSpending({
     history: closed,
-    byCategory: getCategoryMonthlyMap(userId),
+    byCategory: await getCategoryMonthlyMap(userId),
     commitmentMinor: monthlyCommitment(recurring),
   });
   check("produces a forecast", forecast !== null);
@@ -245,7 +245,7 @@ try {
 
   /* ── Budgets ───────────────────────────────────────────────────── */
   section("Budgets");
-  const suggestions = suggestBudgets(userId, 6);
+  const suggestions = await suggestBudgets(userId, 6);
   check("suggests budgets from history", suggestions.length >= 5, `${suggestions.length} suggested`);
   check(
     "suggestions are rounded to memorable figures",
@@ -253,8 +253,8 @@ try {
     suggestions.slice(0, 4).map((s) => money(s.amountMinor)).join(", "),
   );
 
-  for (const s of suggestions.slice(0, 5)) setBudget(userId, s.category, s.amountMinor);
-  const status = getBudgetStatus(userId, currentMonth());
+  for (const s of suggestions.slice(0, 5)) await setBudget(userId, s.category, s.amountMinor);
+  const status = await getBudgetStatus(userId, currentMonth());
   check("budget status computed", status.length === 5, `${status.length} budgets`);
   check("every budget has a state", status.every((b) => ["under", "on-track", "at-risk", "over"].includes(b.state)));
 
@@ -267,7 +267,7 @@ try {
   process.exitCode = failures === 0 ? 0 : 1;
 } finally {
   try {
-    (await import("../lib/db.ts")).getDb().close();
+    closeDb();
   } catch {
     /* already closed */
   }

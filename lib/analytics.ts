@@ -97,37 +97,38 @@ export interface TransactionPage {
   sumMinor: number;
 }
 
-export function queryTransactions(userId: number, f: TransactionFilters = {}): TransactionPage {
+export async function queryTransactions(userId: number, f: TransactionFilters = {}): Promise<TransactionPage> {
   const { where, params } = buildWhere(userId, f);
   const order = SORTS[f.sort ?? "date_desc"] ?? SORTS.date_desc;
   const limit = Math.min(Math.max(f.limit ?? 50, 1), 500);
   const offset = Math.max(f.offset ?? 0, 0);
 
-  const rows = all<Transaction & { account_name: string }>(
-    `SELECT t.*, a.name AS account_name
-       FROM transactions t
-       JOIN accounts a ON a.id = t.account_id
-      WHERE ${where}
-      ORDER BY ${order}
-      LIMIT ? OFFSET ?`,
-    ...params,
-    limit,
-    offset,
-  );
-
-  const agg = get<{ n: number; s: number | null }>(
-    `SELECT COUNT(*) AS n, SUM(t.amount_minor) AS s FROM transactions t WHERE ${where}`,
-    ...params,
-  );
+  const [rows, agg] = await Promise.all([
+    all<Transaction & { account_name: string }>(
+      `SELECT t.*, a.name AS account_name
+         FROM transactions t
+         JOIN accounts a ON a.id = t.account_id
+        WHERE ${where}
+        ORDER BY ${order}
+        LIMIT ? OFFSET ?`,
+      ...params,
+      limit,
+      offset,
+    ),
+    get<{ n: number; s: number | null }>(
+      `SELECT COUNT(*) AS n, SUM(t.amount_minor) AS s FROM transactions t WHERE ${where}`,
+      ...params,
+    ),
+  ]);
 
   return { rows, total: agg?.n ?? 0, sumMinor: agg?.s ?? 0 };
 }
 
-export function getTransaction(userId: number, id: number): Transaction | undefined {
+export function getTransaction(userId: number, id: number): Promise<Transaction | undefined> {
   return get<Transaction>("SELECT * FROM transactions WHERE user_id = ? AND id = ?", userId, id);
 }
 
-export function allTransactions(userId: number): Transaction[] {
+export function allTransactions(userId: number): Promise<Transaction[]> {
   return all<Transaction>(
     "SELECT * FROM transactions WHERE user_id = ? ORDER BY date ASC, id ASC",
     userId,
@@ -143,8 +144,8 @@ export function allTransactions(userId: number): Transaction[] {
  * so that charts and the forecaster see an unbroken series — a missing month
  * would silently shift every lag feature by one.
  */
-export function getMonthlySeries(userId: number, monthsBack = 24): MonthlyPoint[] {
-  const rows = all<{ month: string; spend: number; income: number; n: number }>(
+export async function getMonthlySeries(userId: number, monthsBack = 24): Promise<MonthlyPoint[]> {
+  const rows = await all<{ month: string; spend: number; income: number; n: number }>(
     `SELECT substr(date, 1, 7) AS month,
             COALESCE(SUM(CASE WHEN amount_minor < 0 THEN -amount_minor ELSE 0 END), 0) AS spend,
             COALESCE(SUM(CASE WHEN amount_minor > 0 THEN  amount_minor ELSE 0 END), 0) AS income,
@@ -177,8 +178,8 @@ export function getMonthlySeries(userId: number, monthsBack = 24): MonthlyPoint[
 }
 
 /** Per-category monthly spend, shaped for the forecaster. */
-export function getCategoryMonthlyMap(userId: number): Map<string, Map<string, number>> {
-  const rows = all<{ category: string; month: string; total: number }>(
+export async function getCategoryMonthlyMap(userId: number): Promise<Map<string, Map<string, number>>> {
+  const rows = await all<{ category: string; month: string; total: number }>(
     `SELECT category, substr(date, 1, 7) AS month, SUM(-amount_minor) AS total
        FROM transactions
       WHERE user_id = ? AND amount_minor < 0 AND ${NOT_TRANSFER}
@@ -216,14 +217,14 @@ export function getDailySeries(userId: number, from: string, to: string) {
 /* Category breakdown                                                      */
 /* ---------------------------------------------------------------------- */
 
-export function getCategoryTotals(
+export async function getCategoryTotals(
   userId: number,
   from: string,
   to: string,
   kind: "expense" | "income" = "expense",
-): CategoryTotal[] {
+): Promise<CategoryTotal[]> {
   const sign = kind === "expense" ? "amount_minor < 0" : "amount_minor > 0";
-  const rows = all<{ category: string; total: number; n: number }>(
+  const rows = await all<{ category: string; total: number; n: number }>(
     `SELECT category, SUM(ABS(amount_minor)) AS total, COUNT(*) AS n
        FROM transactions
       WHERE user_id = ? AND ${sign} AND ${NOT_TRANSFER} AND date BETWEEN ? AND ?
@@ -279,8 +280,8 @@ export interface Kpis {
   noSpendDays: number;
 }
 
-export function getKpis(userId: number, from: string, to: string): Kpis {
-  const r = get<{
+export async function getKpis(userId: number, from: string, to: string): Promise<Kpis> {
+  const r = await get<{
     spend: number | null;
     income: number | null;
     n: number;
@@ -336,14 +337,14 @@ export interface BudgetStatus {
   state: "under" | "on-track" | "at-risk" | "over";
 }
 
-export function getBudgetStatus(userId: number, month = currentMonth()): BudgetStatus[] {
-  const budgets = all<{ category: string; amount_minor: number }>(
+export async function getBudgetStatus(userId: number, month = currentMonth()): Promise<BudgetStatus[]> {
+  const budgets = await all<{ category: string; amount_minor: number }>(
     "SELECT category, amount_minor FROM budgets WHERE user_id = ? ORDER BY amount_minor DESC",
     userId,
   );
   if (!budgets.length) return [];
 
-  const spendRows = all<{ category: string; total: number }>(
+  const spendRows = await all<{ category: string; total: number }>(
     `SELECT category, SUM(-amount_minor) AS total
        FROM transactions
       WHERE user_id = ? AND amount_minor < 0 AND ${NOT_TRANSFER} AND substr(date,1,7) = ?
@@ -438,8 +439,8 @@ export function detectAnomalies(
 /* Misc                                                                    */
 /* ---------------------------------------------------------------------- */
 
-export function getDateBounds(userId: number): { min: string; max: string } | null {
-  const r = get<{ min: string | null; max: string | null }>(
+export async function getDateBounds(userId: number): Promise<{ min: string; max: string } | null> {
+  const r = await get<{ min: string | null; max: string | null }>(
     "SELECT MIN(date) AS min, MAX(date) AS max FROM transactions WHERE user_id = ?",
     userId,
   );
@@ -447,13 +448,14 @@ export function getDateBounds(userId: number): { min: string; max: string } | nu
   return { min: r.min, max: r.max };
 }
 
-export function countTransactions(userId: number): number {
-  return get<{ n: number }>("SELECT COUNT(*) AS n FROM transactions WHERE user_id = ?", userId)?.n ?? 0;
+export async function countTransactions(userId: number): Promise<number> {
+  const r = await get<{ n: number }>("SELECT COUNT(*) AS n FROM transactions WHERE user_id = ?", userId);
+  return r?.n ?? 0;
 }
 
 /** Spend split by weekday vs weekend — a reliably surprising statistic. */
-export function weekdayProfile(userId: number, from: string, to: string) {
-  const rows = all<{ dow: string; total: number; n: number }>(
+export async function weekdayProfile(userId: number, from: string, to: string) {
+  const rows = await all<{ dow: string; total: number; n: number }>(
     `SELECT strftime('%w', date) AS dow, SUM(-amount_minor) AS total, COUNT(*) AS n
        FROM transactions
       WHERE user_id = ? AND amount_minor < 0 AND ${NOT_TRANSFER} AND date BETWEEN ? AND ?

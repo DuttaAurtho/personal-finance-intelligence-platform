@@ -12,10 +12,10 @@ export const dynamic = "force-dynamic";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   // Safe to call on every request: it's idempotent and cheap, and it means a
-  // user created before a schema addition still gets their defaults.
-  ensureUserSetup(user.id);
-
-  const txCount = countTransactions(user.id);
+  // user created before a schema addition still gets their defaults. Doesn't
+  // depend on and isn't depended on by the transaction count, so both run
+  // together rather than as two sequential round trips.
+  const [, txCount] = await Promise.all([ensureUserSetup(user.id), countTransactions(user.id)]);
 
   return (
     <div className="min-h-screen bg-canvas">

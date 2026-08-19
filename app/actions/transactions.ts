@@ -24,7 +24,7 @@ function refresh() {
 
 export async function updateCategory(transactionId: number, category: string) {
   const user = await requireUser();
-  setCategory(user.id, transactionId, category);
+  await setCategory(user.id, transactionId, category);
   refresh();
 }
 
@@ -40,21 +40,21 @@ export async function updateCategoryForMerchant(
 ) {
   const user = await requireUser();
 
-  const tx = get<{ merchant: string }>(
+  const tx = await get<{ merchant: string }>(
     "SELECT merchant FROM transactions WHERE user_id = ? AND id = ?",
     user.id,
     transactionId,
   );
   if (!tx?.merchant) {
-    setCategory(user.id, transactionId, category);
+    await setCategory(user.id, transactionId, category);
     refresh();
     return { updated: 1 };
   }
 
-  const updated = setCategoryForMerchant(user.id, tx.merchant, category);
+  const updated = await setCategoryForMerchant(user.id, tx.merchant, category);
   if (createStandingRule) {
     try {
-      createRule(user.id, tx.merchant, category, 50);
+      await createRule(user.id, tx.merchant, category, 50);
     } catch {
       /* a duplicate rule is harmless — the first one already wins */
     }
@@ -66,19 +66,19 @@ export async function updateCategoryForMerchant(
 
 export async function toggleTransfer(transactionId: number, isTransfer: boolean) {
   const user = await requireUser();
-  setTransferFlag(user.id, transactionId, isTransfer);
+  await setTransferFlag(user.id, transactionId, isTransfer);
   refresh();
 }
 
 export async function updateNotes(transactionId: number, notes: string) {
   const user = await requireUser();
-  setNotes(user.id, transactionId, notes);
+  await setNotes(user.id, transactionId, notes);
   refresh();
 }
 
 export async function removeTransactions(ids: number[]) {
   const user = await requireUser();
-  const deleted = deleteTransactions(user.id, ids);
+  const deleted = await deleteTransactions(user.id, ids);
   refresh();
   return { deleted };
 }
@@ -86,7 +86,7 @@ export async function removeTransactions(ids: number[]) {
 /** Re-run the classifier across everything the user hasn't confirmed by hand. */
 export async function rerunCategorisation() {
   const user = await requireUser();
-  const result = recategorizeAll(user.id);
+  const result = await recategorizeAll(user.id);
   refresh();
   return result;
 }
@@ -116,11 +116,11 @@ export async function addTransaction(
 
   const category = String(formData.get("category") ?? "").trim() || undefined;
 
-  const accounts = listAccounts(user.id);
+  const accounts = await listAccounts(user.id);
   const accountId = Number(formData.get("account")) || accounts[0]?.id;
   if (!accountId) return { error: "No account to add this to." };
 
-  addManualTransaction(user.id, accountId, { date, description, amountMinor, category });
+  await addManualTransaction(user.id, accountId, { date, description, amountMinor, category });
   refresh();
 
   return { success: `Added ${description}.` };
@@ -137,19 +137,19 @@ export async function addRule(_prev: ManualState, formData: FormData): Promise<M
   if (!category) return { error: "Choose a category." };
 
   try {
-    createRule(user.id, pattern, category);
+    await createRule(user.id, pattern, category);
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not save that rule." };
   }
 
-  recategorizeAll(user.id);
+  await recategorizeAll(user.id);
   refresh();
   return { success: `Anything matching "${pattern}" is now ${category}.` };
 }
 
 export async function removeRule(id: number) {
   const user = await requireUser();
-  deleteRule(user.id, id);
-  recategorizeAll(user.id);
+  await deleteRule(user.id, id);
+  await recategorizeAll(user.id);
   refresh();
 }

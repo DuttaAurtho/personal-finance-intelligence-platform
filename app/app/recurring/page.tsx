@@ -33,7 +33,7 @@ export default async function RecurringPage() {
   const user = await requireUser();
   const cur = user.currency;
 
-  const transactions = allTransactions(user.id);
+  const transactions = await allTransactions(user.id);
   const series = detectRecurring(transactions);
   const active = series.filter((s) => s.status === "active");
   const lapsed = series.filter((s) => s.status === "lapsed");

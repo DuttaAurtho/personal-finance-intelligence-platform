@@ -26,7 +26,7 @@ export async function updateProfile(
   if (!name) return { error: "Give yourself a name." };
   if (!CURRENCIES.includes(currency)) return { error: "Unknown currency." };
 
-  run("UPDATE users SET name = ?, currency = ? WHERE id = ?", name, currency, user.id);
+  await run("UPDATE users SET name = ?, currency = ? WHERE id = ?", name, currency, user.id);
   revalidatePath("/app", "layout");
 
   return { success: "Saved." };
@@ -39,8 +39,8 @@ export async function updateProfile(
  */
 export async function retrainClassifier(): Promise<SettingsState> {
   const user = await requireUser();
-  rebuildMerchants(user.id);
-  const { updated, scanned } = recategorizeAll(user.id);
+  await rebuildMerchants(user.id);
+  const { updated, scanned } = await recategorizeAll(user.id);
   revalidatePath("/app", "layout");
 
   return {
@@ -53,8 +53,9 @@ export async function retrainClassifier(): Promise<SettingsState> {
 
 export async function loadDemoData(): Promise<void> {
   const user = await requireUser();
-  const account = listAccounts(user.id)[0];
-  if (account) seedDemoData(user.id, account.id);
+  const accounts = await listAccounts(user.id);
+  const account = accounts[0];
+  if (account) await seedDemoData(user.id, account.id);
   revalidatePath("/app", "layout");
 }
 
@@ -65,7 +66,7 @@ export async function wipeEverything(formData: FormData): Promise<void> {
   // Typed confirmation, because there is no undo for this one.
   if (String(formData.get("confirm") ?? "").trim().toUpperCase() !== "DELETE") return;
 
-  wipeUserData(user.id);
+  await wipeUserData(user.id);
   revalidatePath("/app", "layout");
   redirect("/app");
 }
@@ -75,6 +76,6 @@ export async function deleteAccount(formData: FormData): Promise<void> {
   if (String(formData.get("confirm") ?? "").trim().toUpperCase() !== "DELETE") return;
 
   // Cascades through transactions, budgets, rules and sessions.
-  run("DELETE FROM users WHERE id = ?", user.id);
+  await run("DELETE FROM users WHERE id = ?", user.id);
   redirect("/");
 }

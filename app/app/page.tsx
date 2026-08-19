@@ -30,10 +30,10 @@ export default async function DashboardPage({
 }) {
   const user = await requireUser();
   const params = await searchParams;
-  const months = availableMonths(user.id);
+  const months = await availableMonths(user.id);
   const month = params.month && months.includes(params.month) ? params.month : months[0] ?? currentMonth();
 
-  const data = getDashboard(user, month);
+  const data = await getDashboard(user, month);
   const cur = user.currency;
 
   if (!data) {

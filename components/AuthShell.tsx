@@ -7,7 +7,12 @@ const POINTS = [
   { icon: "🏷️", text: "Categorisation that learns from your corrections" },
   { icon: "🔁", text: "Finds the subscriptions you forgot you had" },
   { icon: "🔮", text: "Forecasts next month with an honest error range" },
-  { icon: "🔒", text: "Stored in a local SQLite file — nothing leaves your machine" },
+  {
+    icon: "🔒",
+    text: process.env.TURSO_DATABASE_URL
+      ? "Stored in a SQLite database only your account can reach"
+      : "Stored in a local SQLite file — nothing leaves your machine",
+  },
 ];
 
 export default function AuthShell({

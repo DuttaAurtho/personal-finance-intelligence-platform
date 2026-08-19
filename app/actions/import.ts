@@ -45,7 +45,7 @@ export async function importCsv(
   if (text.length > MAX_CHARS)
     return { ok: false, error: "That file is too large. Try splitting it by year." };
 
-  const accounts = listAccounts(user.id);
+  const accounts = await listAccounts(user.id);
   const target = accounts.find((a) => a.id === accountId) ?? accounts[0];
   if (!target) return { ok: false, error: "No account to import into." };
 
@@ -66,7 +66,7 @@ export async function importCsv(
     };
   }
 
-  const summary = importTransactions(
+  const summary = await importTransactions(
     user.id,
     target.id,
     filename || "statement.csv",
@@ -90,14 +90,14 @@ export async function importCsv(
 
 export async function undoImport(batchId: number) {
   const user = await requireUser();
-  const removed = deleteBatch(user.id, batchId);
+  const removed = await deleteBatch(user.id, batchId);
   revalidatePath("/app", "layout");
   return { removed };
 }
 
 export async function addAccount(name: string, type: string, institution?: string) {
   const user = await requireUser();
-  const account = createAccount(
+  const account = await createAccount(
     user.id,
     name,
     (["current", "savings", "credit", "cash", "investment"].includes(type)
