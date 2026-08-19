@@ -25,7 +25,7 @@ import {
   monthStart,
   todayISO,
 } from "./dates";
-import type { User } from "./types";
+import type { RecurringSeries, Transaction, User } from "./types";
 
 /**
  * Assembles everything the dashboard and insights pages need in one pass.
@@ -37,6 +37,33 @@ import type { User } from "./types";
  * network round trip to a hosted database, that's the difference between one
  * round trip's worth of latency and a dozen.
  */
+
+/**
+ * How much of this month's spend, per category, came from recurring fixed
+ * payments that have already gone out. The budget projection holds these flat
+ * instead of extrapolating them, since a monthly bill paid on the 3rd does not
+ * get paid again before month end.
+ */
+export function fixedPaidByCategory(
+  transactions: Transaction[],
+  recurring: RecurringSeries[],
+  month: string,
+): Map<string, number> {
+  const recurringIds = new Set<number>();
+  for (const r of recurring) {
+    if (r.status === "active") for (const id of r.transactionIds) recurringIds.add(id);
+  }
+
+  const out = new Map<string, number>();
+  for (const t of transactions) {
+    if (t.amount_minor >= 0 || t.is_transfer) continue;
+    if (t.date.slice(0, 7) !== month) continue;
+    if (!recurringIds.has(t.id)) continue;
+    out.set(t.category, (out.get(t.category) ?? 0) + -t.amount_minor);
+  }
+  return out;
+}
+
 export async function getDashboard(user: User, month = currentMonth()) {
   const userId = user.id;
 
@@ -57,7 +84,6 @@ export async function getDashboard(user: User, month = currentMonth()) {
     categoriesThisMonth,
     categoriesLastMonth,
     incomeCategories,
-    budgets,
     topMerchants,
     daily,
     weekdays,
@@ -72,7 +98,6 @@ export async function getDashboard(user: User, month = currentMonth()) {
     getCategoryTotals(userId, from, to),
     getCategoryTotals(userId, prevFrom, prevTo),
     getCategoryTotals(userId, from, to, "income"),
-    getBudgetStatus(userId, month),
     getTopMerchants(userId, from, to, 8),
     getDailySeries(userId, from, to),
     weekdayProfile(userId, from, to),
@@ -89,6 +114,12 @@ export async function getDashboard(user: User, month = currentMonth()) {
   /* ── Model-driven views over the full history (pure JS, no I/O) ──── */
   const recurring = detectRecurring(transactions);
   const anomalies = detectAnomalies(transactions);
+  // Needs `recurring`, so it can't join the batch above.
+  const budgets = await getBudgetStatus(
+    userId,
+    month,
+    fixedPaidByCategory(transactions, recurring, month),
+  );
   const risesFound = priceIncreases(recurring, transactions);
   const commitment = monthlyCommitment(recurring);
   const dueSoon = upcoming(recurring, 30);

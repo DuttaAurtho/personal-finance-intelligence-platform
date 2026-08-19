@@ -337,15 +337,24 @@ export interface BudgetStatus {
   state: "under" | "on-track" | "at-risk" | "over";
 }
 
-export async function getBudgetStatus(userId: number, month = currentMonth()): Promise<BudgetStatus[]> {
+export async function getBudgetStatus(
+  userId: number,
+  month = currentMonth(),
+  /**
+   * Per-category spend this month that came from recurring fixed payments.
+   * Those are already-settled commitments, not a rate to extrapolate, so they
+   * are held flat while only the discretionary remainder is scaled up.
+   */
+  fixedPaidByCategory?: Map<string, number>,
+): Promise<BudgetStatus[]> {
   const budgets = await all<{ category: string; amount_minor: number }>(
     "SELECT category, amount_minor FROM budgets WHERE user_id = ? ORDER BY amount_minor DESC",
     userId,
   );
   if (!budgets.length) return [];
 
-  const spendRows = await all<{ category: string; total: number }>(
-    `SELECT category, SUM(-amount_minor) AS total
+  const spendRows = await all<{ category: string; total: number; n: number }>(
+    `SELECT category, SUM(-amount_minor) AS total, COUNT(*) AS n
        FROM transactions
       WHERE user_id = ? AND amount_minor < 0 AND ${NOT_TRANSFER} AND substr(date,1,7) = ?
       GROUP BY category`,
@@ -353,6 +362,7 @@ export async function getBudgetStatus(userId: number, month = currentMonth()): P
     month,
   );
   const spent = new Map(spendRows.map((r) => [r.category, r.total]));
+  const txCount = new Map(spendRows.map((r) => [r.category, r.n]));
 
   const total = daysInMonth(month);
   const today = todayISO();
@@ -363,7 +373,28 @@ export async function getBudgetStatus(userId: number, month = currentMonth()): P
   return budgets.map((b) => {
     const spentMinor = spent.get(b.category) ?? 0;
     const usage = b.amount_minor > 0 ? spentMinor / b.amount_minor : 0;
-    const projectedMinor = elapsed > 0 ? Math.round(spentMinor / fraction) : spentMinor;
+
+    // Scaling spend-so-far by the fraction of the month elapsed assumes the
+    // spending is a steady trickle. That holds for groceries and is badly wrong
+    // for fixed commitments: rent paid on the 1st, or five monthly utility
+    // bills, would each be projected to nearly double by month end and the
+    // dashboard would announce an overshoot that cannot happen. So the
+    // recurring portion is held flat and only the discretionary rest is scaled.
+    //
+    // Without a recurring breakdown, fall back to transaction count — a
+    // category carried by one or two payments has no rate worth extrapolating.
+    const fixedPaid = Math.min(spentMinor, fixedPaidByCategory?.get(b.category) ?? 0);
+    const variableSoFar = Math.max(0, spentMinor - fixedPaid);
+
+    let projectedMinor: number;
+    if (elapsed <= 0) {
+      projectedMinor = spentMinor;
+    } else if (fixedPaidByCategory) {
+      projectedMinor = Math.round(fixedPaid + variableSoFar / fraction);
+    } else {
+      projectedMinor =
+        (txCount.get(b.category) ?? 0) >= 3 ? Math.round(spentMinor / fraction) : spentMinor;
+    }
 
     let state: BudgetStatus["state"];
     // Spend landing exactly on the ceiling is fully used, not exceeded — only

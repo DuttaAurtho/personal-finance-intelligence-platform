@@ -28,70 +28,28 @@ const EXAMPLE_TREND = [
   { month: "2026-03", valueMinor: 142000 },
 ];
 
+/**
+ * Six capabilities, one line each.
+ *
+ * An earlier version listed nine features with a full paragraph apiece, plus a
+ * long essay on the models. Nobody reads a wall of text on a landing page —
+ * it reads as noise and buries the two things that actually matter, which are
+ * what the product does and the button that shows it doing it. The detail all
+ * still exists inside the app, on the pages where it is relevant.
+ */
 const FEATURES = [
-  {
-    icon: "📥",
-    title: "Import any bank CSV",
-    body: "Drop in a statement from any bank. Fiscora sniffs the delimiter, works out which column is the date and which is the amount, and handles split debit/credit columns without being told.",
-  },
-  {
-    icon: "🏷️",
-    title: "Categorisation that learns",
-    body: "A curated merchant lexicon labels your first import. After that a Naive Bayes classifier trains on every correction you make, so it learns your local coffee shop, not just the chains.",
-  },
-  {
-    icon: "📊",
-    title: "Monthly spending dashboard",
-    body: "Where the money went, ranked and readable, with month-on-month movement called out. No hunting through a table to find the thing that changed.",
-  },
-  {
-    icon: "⚖️",
-    title: "Income vs expenses",
-    body: "Cashflow and savings rate side by side, with internal transfers excluded so moving money into savings never gets counted as spending.",
-  },
-  {
-    icon: "🎯",
-    title: "Budget tracking",
-    body: "Set a ceiling per category, or let Fiscora propose one from your own history. Straight-line projection warns you mid-month, while you can still do something about it.",
-  },
-  {
-    icon: "🔁",
-    title: "Recurring-payment detection",
-    body: "Finds subscriptions by looking for rhythm in your payment history rather than matching a brand list — so it catches the gym and the window cleaner too, and flags price rises.",
-  },
-  {
-    icon: "🔮",
-    title: "Spending predictions",
-    body: "Five forecasting models, weighted by how well each one predicted your own past months, with an honest 80% range instead of a single confident-looking number.",
-  },
-  {
-    icon: "💡",
-    title: "Financial insights",
-    body: "Plain-English findings ranked by how much they matter — unusual charges, category drift, subscription creep, and the habits quietly costing you the most.",
-  },
-  {
-    icon: "🔎",
-    title: "Search and filter",
-    body: "Full-text search across descriptions, merchants and notes, combined with date, amount, category and account filters. Export any view back out as CSV.",
-  },
+  { icon: "📥", title: "Import any bank CSV", body: "Columns detected automatically." },
+  { icon: "🏷️", title: "Categorises itself", body: "And learns from your corrections." },
+  { icon: "🔁", title: "Finds subscriptions", body: "Including the ones you forgot." },
+  { icon: "🎯", title: "Budget tracking", body: "Warned mid-month, not after." },
+  { icon: "🔮", title: "Forecasts next month", body: "With an honest range, not one number." },
+  { icon: "🔎", title: "Search and export", body: "Your data leaves as easily as it arrived." },
 ];
 
 const STEPS = [
-  {
-    n: "01",
-    title: "Export a CSV from your bank",
-    body: "Every bank offers this — usually under 'statements' or 'download transactions'. No account linking, no third-party aggregator, no credentials to hand over.",
-  },
-  {
-    n: "02",
-    title: "Drop it in",
-    body: "Fiscora maps the columns itself and shows you a preview before anything is saved. Re-importing an overlapping statement won't create duplicates.",
-  },
-  {
-    n: "03",
-    title: "Read what it found",
-    body: "Categories, budgets, recurring payments, anomalies and next month's forecast — all computed on the spot from your own numbers.",
-  },
+  { n: "01", title: "Export a CSV from your bank", body: "No account linking, no credentials shared." },
+  { n: "02", title: "Drop it in", body: "Preview it before anything is saved." },
+  { n: "03", title: "Read what it found", body: "Categories, budgets, subscriptions, forecast." },
 ];
 
 const isRemoteDb = !!process.env.TURSO_DATABASE_URL;
@@ -106,7 +64,7 @@ export default async function LandingPage() {
 
       {/* ── Navigation ────────────────────────────────────────────── */}
       <header className="relative z-20 border-b border-line/60 backdrop-blur-sm">
-        <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5">
+        <nav className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-5">
           <Link href="/" aria-label="Fiscora home">
             <Logo />
           </Link>
@@ -114,7 +72,6 @@ export default async function LandingPage() {
           <div className="hidden items-center gap-1 md:flex">
             <a href="#features" className="btn btn-ghost">Features</a>
             <a href="#how" className="btn btn-ghost">How it works</a>
-            <a href="#intelligence" className="btn btn-ghost">The ML</a>
             <a href="#privacy" className="btn btn-ghost">Privacy</a>
           </div>
 
@@ -129,7 +86,7 @@ export default async function LandingPage() {
       {/* ── Hero ──────────────────────────────────────────────────── */}
       <section className="relative z-10">
         <div className="grid-lines absolute inset-0 -z-10" aria-hidden="true" />
-        <div className="mx-auto max-w-6xl px-5 pb-16 pt-16 sm:pt-24">
+        <div className="mx-auto max-w-5xl px-5 pb-20 pt-16 sm:pt-24">
           <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_1fr]">
             <div className="stack-fade">
               <span className="chip border-line-strong bg-surface text-muted">
@@ -138,7 +95,7 @@ export default async function LandingPage() {
                   style={{ background: "var(--viz-good)" }}
                   aria-hidden="true"
                 />
-                Free and open · {isRemoteDb ? "self-hosted, your own database" : "runs on your own machine"}
+                Free and open · {isRemoteDb ? "your own private database" : "runs on your own machine"}
               </span>
 
               <h1 className="mt-5 text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-fg sm:text-5xl lg:text-[3.4rem]">
@@ -147,10 +104,9 @@ export default async function LandingPage() {
                 Fiscora tells you the <span className="text-gradient">story</span>.
               </h1>
 
-              <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-muted sm:text-lg">
-                Import a CSV of your transactions and get a full picture back: automatic
-                categorisation, budgets, the subscriptions you forgot about, and a machine-learned
-                forecast of what next month will actually cost you.
+              <p className="mt-5 max-w-md text-pretty text-base leading-relaxed text-muted sm:text-lg">
+                Import a CSV of your transactions and see exactly where the money goes — and what
+                next month will cost.
               </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -166,8 +122,7 @@ export default async function LandingPage() {
               </div>
 
               <p className="mt-4 text-sm text-subtle">
-                The demo loads two years of realistic sample data. No email required, nothing to
-                cancel.
+                Two years of sample data. No email required.
               </p>
             </div>
 
@@ -221,189 +176,71 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Features ──────────────────────────────────────────────── */}
-      <section id="features" className="relative z-10 border-t border-line/60 bg-surface/40 py-20">
-        <div className="mx-auto max-w-6xl px-5">
-          <div className="max-w-2xl">
-            <h2 className="text-3xl font-semibold tracking-tight text-fg">
-              Everything a finance app should do, and nothing it shouldn&apos;t
-            </h2>
-            <p className="mt-3 text-base leading-relaxed text-muted">
-              No ads, no upsells, no selling your transaction history to anybody. Every feature
-              below runs against a SQLite database you own
-              {isRemoteDb ? ", hosted under your own account" : " on this machine"}.
-            </p>
-          </div>
+      <section id="features" className="relative z-10 border-t border-line/60 py-20">
+        <div className="mx-auto max-w-5xl px-5">
+          <h2 className="text-2xl font-semibold tracking-tight text-fg sm:text-3xl">
+            Everything you need, nothing you don&apos;t
+          </h2>
 
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-10 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((f) => (
-              <article key={f.title} className="card card-hover h-full px-5 py-5">
-                <div
-                  aria-hidden="true"
-                  className="mb-3.5 flex h-10 w-10 items-center justify-center rounded-xl bg-surface-3 text-lg"
-                >
-                  {f.icon}
-                </div>
-                <h3 className="text-[0.9375rem] font-semibold text-fg">{f.title}</h3>
-                <p className="mt-1.5 text-[0.875rem] leading-relaxed text-muted">{f.body}</p>
-              </article>
+              <div key={f.title}>
+                <span aria-hidden="true" className="text-xl">{f.icon}</span>
+                <h3 className="mt-2.5 text-[0.9375rem] font-semibold text-fg">{f.title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted">{f.body}</p>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
       {/* ── How it works ──────────────────────────────────────────── */}
-      <section id="how" className="relative z-10 py-20">
-        <div className="mx-auto max-w-6xl px-5">
-          <h2 className="text-3xl font-semibold tracking-tight text-fg">Three steps</h2>
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
+      <section id="how" className="relative z-10 border-t border-line/60 py-20">
+        <div className="mx-auto max-w-5xl px-5">
+          <h2 className="text-2xl font-semibold tracking-tight text-fg sm:text-3xl">
+            Three steps
+          </h2>
+
+          <ol className="mt-10 grid gap-8 md:grid-cols-3">
             {STEPS.map((s) => (
-              <div key={s.n} className="relative">
+              <li key={s.n}>
                 <span className="text-sm font-semibold tabular-nums text-brand">{s.n}</span>
-                <h3 className="mt-2 text-lg font-semibold text-fg">{s.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{s.body}</p>
-              </div>
+                <h3 className="mt-2 text-[0.9375rem] font-semibold text-fg">{s.title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted">{s.body}</p>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
       </section>
 
-      {/* ── The ML ────────────────────────────────────────────────── */}
-      <section
-        id="intelligence"
-        className="relative z-10 border-y border-line/60 bg-surface/40 py-20"
-      >
-        <div className="mx-auto max-w-6xl px-5">
-          <div className="grid gap-12 lg:grid-cols-2">
-            <div>
-              <h2 className="text-3xl font-semibold tracking-tight text-fg">
-                The intelligence part, explained honestly
-              </h2>
-              <p className="mt-4 text-base leading-relaxed text-muted">
-                &ldquo;AI-powered&rdquo; usually means an API call to somebody else&apos;s server
-                with your bank statement attached. Fiscora&apos;s models are small, classical and
-                run in-process in a few milliseconds — which is exactly why the product can be free
-                and private at the same time.
-              </p>
-
-              <dl className="mt-8 space-y-5">
-                <div>
-                  <dt className="text-[0.9375rem] font-semibold text-fg">
-                    Multinomial Naive Bayes · categorisation
-                  </dt>
-                  <dd className="mt-1 text-sm leading-relaxed text-muted">
-                    Trained on the categories you confirm, using word tokens, character trigrams to
-                    survive truncated bank descriptions, and weak priors on amount and day of month.
-                    Every correction is a labelled example.
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[0.9375rem] font-semibold text-fg">
-                    Interval regularity · recurring payments
-                  </dt>
-                  <dd className="mt-1 text-sm leading-relaxed text-muted">
-                    Scores each merchant on how consistent the gaps between payments are and how
-                    stable the amount is, using median absolute deviation so one late payment
-                    doesn&apos;t hide a subscription.
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[0.9375rem] font-semibold text-fg">
-                    Weighted ensemble · forecasting
-                  </dt>
-                  <dd className="mt-1 text-sm leading-relaxed text-muted">
-                    Exponential smoothing, a robust median, a damped Holt trend, a seasonal
-                    comparison and a ridge regression on lag features. Each is backtested on your
-                    own history with an expanding window, then weighted by inverse error.
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[0.9375rem] font-semibold text-fg">
-                    Robust z-scores · anomaly detection
-                  </dt>
-                  <dd className="mt-1 text-sm leading-relaxed text-muted">
-                    Compares each charge against the distribution of that same category in your own
-                    history, so &ldquo;unusually large&rdquo; means unusual for you rather than
-                    unusual for some average customer.
-                  </dd>
-                </div>
-              </dl>
-            </div>
-
-            <div className="space-y-4">
-              <div className="card px-5 py-5">
-                <h3 className="text-sm font-semibold text-fg">Why an ensemble?</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">
-                  A trend model is excellent for someone whose costs are creeping up and misleading
-                  for someone whose spending is flat but noisy. Rather than guessing which kind of
-                  person you are, Fiscora runs all five, measures how each performed on your last
-                  twelve months, and weights them accordingly. The blend is almost always better
-                  than its best member — and it degrades gracefully when you&apos;ve only imported
-                  three months.
-                </p>
-              </div>
-
-              <div className="card px-5 py-5">
-                <h3 className="text-sm font-semibold text-fg">Why a range, not a number?</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">
-                  The prediction interval comes from the model&apos;s own backtest residuals, so it
-                  widens automatically for people whose spending is genuinely erratic. A single
-                  confident figure would be more satisfying and less true.
-                </p>
-              </div>
-
-              <div className="card px-5 py-5">
-                <h3 className="text-sm font-semibold text-fg">Where the accuracy is shown</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">
-                  The forecast page reports the mean absolute percentage error the ensemble achieved
-                  on your history, and the weight each model earned. If the models are doing badly
-                  on your data, you get to see that.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Privacy ───────────────────────────────────────────────── */}
-      <section id="privacy" className="relative z-10 py-20">
-        <div className="mx-auto max-w-4xl px-5 text-center">
+      {/* ── Privacy + closing call to action ──────────────────────── */}
+      <section id="privacy" className="relative z-10 border-t border-line/60 py-24">
+        <div className="mx-auto max-w-2xl px-5 text-center">
           <div
             aria-hidden="true"
-            className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-soft text-xl"
+            className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-soft text-xl"
           >
             🔒
           </div>
-          <h2 className="text-3xl font-semibold tracking-tight text-fg">
-            {isRemoteDb ? "Your data stays in a database only you control" : "Your statements never leave your machine"}
+
+          <h2 className="text-2xl font-semibold tracking-tight text-fg sm:text-3xl">
+            {isRemoteDb ? "Your data, your database" : "Your statements never leave your machine"}
           </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-muted">
-            {isRemoteDb ? (
-              <>
-                Fiscora stores everything in a SQLite database you host yourself, reachable only
-                with your own access token. There is no analytics script, no telemetry and no
-                third-party service in the loop — every calculation runs on this server, not a
-                hosted API. Delete the database and the data is genuinely gone.
-              </>
-            ) : (
-              <>
-                Fiscora stores everything in a single SQLite file in the project&apos;s{" "}
-                <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[0.8125rem]">
-                  data/
-                </code>{" "}
-                directory. There is no analytics script, no telemetry, no external API call and no
-                hosted backend. Delete the file and the data is genuinely gone.
-              </>
-            )}
+
+          <p className="mx-auto mt-4 text-base leading-relaxed text-muted">
+            {isRemoteDb
+              ? "Everything lives in a database only you can reach. No analytics, no telemetry, nothing sold on."
+              : "Everything lives in a single SQLite file on this machine. No analytics, no telemetry, nothing sold on."}
           </p>
 
           <div className="mt-10 flex flex-wrap justify-center gap-3">
             <form action={startDemo}>
               <button type="submit" className="btn btn-primary h-11 px-6 text-[0.9375rem]">
-                Try it with sample data
+                Explore the live demo
               </button>
             </form>
             <Link href="/register" className="btn btn-secondary h-11 px-6 text-[0.9375rem]">
-              Start with my own CSV
+              Create an account
             </Link>
           </div>
         </div>
@@ -411,20 +248,17 @@ export default async function LandingPage() {
 
       {/* ── Footer ────────────────────────────────────────────────── */}
       <footer className="relative z-10 border-t border-line/60 py-10">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 sm:flex-row">
+        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 px-5 sm:flex-row">
           <Logo size={22} />
-          <div className="text-center text-sm text-subtle sm:text-left">
-            <p>Personal Finance Intelligence Platform · built with Next.js and SQLite</p>
-            <p className="mt-1">
-              Made by <span className="font-medium text-muted">Aurtho Dutta</span> ·{" "}
-              <a
-                href="mailto:dutta.aurtho@gmail.com"
-                className="font-medium text-brand hover:underline"
-              >
-                dutta.aurtho@gmail.com
-              </a>
-            </p>
-          </div>
+          <p className="text-center text-sm text-subtle sm:text-left">
+            Made by <span className="font-medium text-muted">Aurtho Dutta</span> ·{" "}
+            <a
+              href="mailto:dutta.aurtho@gmail.com"
+              className="font-medium text-brand hover:underline"
+            >
+              dutta.aurtho@gmail.com
+            </a>
+          </p>
           <div className="flex items-center gap-2">
             <Link href="/login" className="btn btn-ghost">Sign in</Link>
             <ThemeToggle compact />

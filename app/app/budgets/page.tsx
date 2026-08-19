@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { getBudgetStatus, getKpis } from "@/lib/analytics";
+import { allTransactions, getBudgetStatus, getKpis } from "@/lib/analytics";
+import { detectRecurring } from "@/lib/recurring";
 import { suggestBudgets } from "@/lib/repository";
-import { availableMonths } from "@/lib/dashboard";
+import { availableMonths, fixedPaidByCategory } from "@/lib/dashboard";
 import { currentMonth, formatMonth, monthEnd, monthStart } from "@/lib/dates";
 import { formatMoney, formatPercent } from "@/lib/money";
 import { Card, CardHeader, EmptyState, PageHeader, StatTile } from "@/components/ui";
@@ -25,11 +26,19 @@ export default async function BudgetsPage({
   const months = await availableMonths(user.id);
   const month = sp.month && months.includes(sp.month) ? sp.month : months[0] ?? currentMonth();
 
-  const [budgets, suggestions, kpis] = await Promise.all([
-    getBudgetStatus(user.id, month),
+  // The projection must hold recurring commitments flat rather than scaling
+  // them with the month, so this page needs the same recurring breakdown the
+  // dashboard uses — otherwise the two would disagree about the same budget.
+  const [transactions, suggestions, kpis] = await Promise.all([
+    allTransactions(user.id),
     suggestBudgets(user.id, 6),
     getKpis(user.id, monthStart(month), monthEnd(month)),
   ]);
+  const budgets = await getBudgetStatus(
+    user.id,
+    month,
+    fixedPaidByCategory(transactions, detectRecurring(transactions), month),
+  );
   const cur = user.currency;
 
   const totalBudget = budgets.reduce((a, b) => a + b.budgetMinor, 0);
@@ -128,11 +137,11 @@ export default async function BudgetsPage({
       <Card className="px-5 py-4">
         <h2 className="text-sm font-semibold text-fg">How the projection works</h2>
         <p className="mt-2 max-w-3xl text-[0.8125rem] leading-relaxed text-muted">
-          The projected figure scales what you&apos;ve spent so far by how much of the month is
-          left. It&apos;s deliberately simple and slightly pessimistic early in the month, which is
-          when a warning is still useful. A category is flagged <strong>at risk</strong> when the
-          projection lands more than 5% above the ceiling — enough headroom that normal variation
-          doesn&apos;t cry wolf.
+          Recurring payments that have already gone out are counted once and held flat — a
+          monthly bill paid on the 3rd doesn&apos;t get paid again before month end. Only the
+          discretionary rest is scaled by how much of the month is left. A category is flagged{" "}
+          <strong>at risk</strong> when that projection lands more than 5% above the ceiling —
+          enough headroom that normal variation doesn&apos;t cry wolf.
         </p>
       </Card>
     </div>
