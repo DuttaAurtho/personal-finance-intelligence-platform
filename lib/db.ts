@@ -1,4 +1,4 @@
-import { createClient, type Client, type InValue, type ResultSet } from "@libsql/client";
+import type { Client, InValue, ResultSet } from "@libsql/client";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
@@ -16,6 +16,17 @@ import path from "node:path";
  * The client API is promise-based (it's a network protocol under the hood,
  * even for the local file case), so every query in this app is async —
  * unlike the node:sqlite version this replaced.
+ *
+ * The two modes deliberately load different builds of the client package.
+ * `@libsql/client`'s default entry unconditionally imports its local-file
+ * driver at module-evaluation time, which pulls in a native binary — fine for
+ * local dev, but a well-known way for a serverless function's bundle to fail
+ * to load on a platform it wasn't built for. `@libsql/client/web` has no
+ * local-file support and therefore no native dependency at all, which is why
+ * it's the build Turso recommends for exactly this deployment shape. Since
+ * the remote path never needs `file:` URLs, it costs nothing to use it there
+ * and sidesteps that failure mode entirely — loaded via dynamic `import()` so
+ * the *other* build's native dependency is never evaluated in the same process.
  */
 
 const isRemote = !!process.env.TURSO_DATABASE_URL;
@@ -23,36 +34,30 @@ const LOCAL_DB_PATH = process.env.FISCORA_DB ?? path.join(process.cwd(), "data",
 
 declare global {
   // eslint-disable-next-line no-var
-  var __fiscoraClient: Client | undefined;
-  // eslint-disable-next-line no-var
-  var __fiscoraReady: Promise<void> | undefined;
+  var __fiscoraClient: Promise<Client> | undefined;
 }
 
-function createFiscoraClient(): Client {
+async function createFiscoraClient(): Promise<Client> {
   if (isRemote) {
+    const { createClient } = await import("@libsql/client/web");
     return createClient({
       url: process.env.TURSO_DATABASE_URL!,
       authToken: process.env.TURSO_AUTH_TOKEN,
       intMode: "number",
     });
   }
+  const { createClient } = await import("@libsql/client");
   mkdirSync(path.dirname(LOCAL_DB_PATH), { recursive: true });
   return createClient({ url: `file:${LOCAL_DB_PATH}`, intMode: "number" });
 }
 
-function client(): Client {
-  if (!globalThis.__fiscoraClient) globalThis.__fiscoraClient = createFiscoraClient();
+/** Lazily creates, migrates and caches the connection — every query awaits this first. */
+function client(): Promise<Client> {
+  if (!globalThis.__fiscoraClient) globalThis.__fiscoraClient = createFiscoraClient().then(initSchema);
   return globalThis.__fiscoraClient;
 }
 
-/** Runs once per process: pragmas + schema migration. Every entry point awaits this first. */
-function ready(): Promise<void> {
-  if (!globalThis.__fiscoraReady) globalThis.__fiscoraReady = init();
-  return globalThis.__fiscoraReady;
-}
-
-async function init(): Promise<void> {
-  const c = client();
+async function initSchema(c: Client): Promise<Client> {
   if (!isRemote) {
     // WAL and a busy timeout only make sense against a local file; a remote
     // libSQL server manages its own concurrency.
@@ -61,6 +66,7 @@ async function init(): Promise<void> {
   }
   await c.execute("PRAGMA foreign_keys = ON");
   await c.executeMultiple(SCHEMA);
+  return c;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -223,8 +229,8 @@ function makeQueries(exec: Executor) {
 }
 
 const rootQueries = makeQueries(async (sql, args) => {
-  await ready();
-  return client().execute({ sql, args });
+  const c = await client();
+  return c.execute({ sql, args });
 });
 
 export const all = rootQueries.all;
@@ -256,8 +262,8 @@ export async function batch(
   statements: BatchStatement[],
 ): Promise<{ changes: number; lastInsertRowid: number }[]> {
   if (!statements.length) return [];
-  await ready();
-  const results = await client().batch(
+  const c = await client();
+  const results = await c.batch(
     statements.map((s) => ({ sql: s.sql, args: normalise(s.params ?? []) })),
     "write",
   );
@@ -276,8 +282,8 @@ export async function batch(
 export async function transact<T>(
   fn: (t: { all: typeof all; get: typeof get; run: typeof run }) => Promise<T>,
 ): Promise<T> {
-  await ready();
-  const tx = await client().transaction("write");
+  const c = await client();
+  const tx = await c.transaction("write");
   const scoped = makeQueries((sql, args) => tx.execute({ sql, args }));
   try {
     const result = await fn(scoped);
@@ -295,8 +301,8 @@ export function placeholders(n: number): string {
 }
 
 /** Closes the connection — used by scripts and tests that need a clean exit. */
-export function closeDb(): void {
-  globalThis.__fiscoraClient?.close();
+export async function closeDb(): Promise<void> {
+  const pending = globalThis.__fiscoraClient;
   globalThis.__fiscoraClient = undefined;
-  globalThis.__fiscoraReady = undefined;
+  (await pending)?.close();
 }

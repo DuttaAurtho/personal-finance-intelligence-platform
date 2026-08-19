@@ -267,7 +267,7 @@ try {
   process.exitCode = failures === 0 ? 0 : 1;
 } finally {
   try {
-    closeDb();
+    await closeDb();
   } catch {
     /* already closed */
   }
