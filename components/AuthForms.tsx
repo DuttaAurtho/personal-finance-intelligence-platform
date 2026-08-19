@@ -132,13 +132,11 @@ export function SignUpForm() {
         <input
           type="checkbox"
           name="seed"
-          defaultChecked
           className="mt-0.5 h-4 w-4 accent-[var(--brand)]"
         />
         <span className="text-sm text-muted">
-          <span className="font-medium text-fg">Load sample data</span> — two years of realistic
-          transactions so there is something to look at straight away. You can wipe it any time from
-          Settings.
+          <span className="font-medium text-fg">Fill it with sample data first</span> — two years of
+          invented transactions to explore. Leave this unticked to start empty and import your own.
         </span>
       </label>
 
