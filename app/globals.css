@@ -282,9 +282,13 @@
     background-color: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
+    /* Layered rather than a single blur: a tight contact shadow to seat the
+       card on the canvas, plus a wide, very soft ambient one for depth. A
+       single mid-blur shadow is what makes cards read as flat and cheap. */
     box-shadow:
-      0 1px 2px hsl(var(--shadow-color) / 0.04),
-      0 4px 16px -6px hsl(var(--shadow-color) / 0.06);
+      0 1px 1px hsl(var(--shadow-color) / 0.04),
+      0 2px 4px -1px hsl(var(--shadow-color) / 0.05),
+      0 12px 28px -12px hsl(var(--shadow-color) / 0.10);
   }
 
   .card-hover {

@@ -3,9 +3,10 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { availableMonths, getDashboard } from "@/lib/dashboard";
 import { currentMonth, formatDate, formatMonth, relativeDay } from "@/lib/dates";
-import { formatMoney, formatPercent, pctChange } from "@/lib/money";
+import { formatMoney, formatPercent, formatPercentAbs, pctChange } from "@/lib/money";
 import { categoryIcon } from "@/lib/categories";
-import { Badge, Card, CardHeader, EmptyState, StatTile } from "@/components/ui";
+import { merchantLabel } from "@/lib/categorize";
+import { Badge, Card, CardHeader, EmptyState, SectionLabel, StatTile } from "@/components/ui";
 import MonthPicker from "@/components/MonthPicker";
 import TrendChart from "@/components/charts/TrendChart";
 import RankedBars from "@/components/charts/RankedBars";
@@ -93,7 +94,7 @@ export default async function DashboardPage({
           delta={
             spendDelta !== null
               ? {
-                  text: `${formatPercent(Math.abs(spendDelta))} vs ${formatMonth(
+                  text: `${formatPercentAbs(spendDelta)} vs ${formatMonth(
                     months[months.indexOf(month) + 1] ?? month,
                     true,
                   )}`,
@@ -118,7 +119,7 @@ export default async function DashboardPage({
         />
 
         <StatTile
-          label="Net position"
+          label="Left over"
           value={formatMoney(data.kpis.netMinor, cur, { signed: true })}
           delta={
             // Early in the current month, income may barely have landed yet
@@ -144,9 +145,9 @@ export default async function DashboardPage({
         />
 
         <StatTile
-          label="Committed monthly"
+          label="Regular bills"
           value={formatMoney(data.commitment, cur)}
-          hint={`${data.recurring.filter((r) => r.status === "active").length} recurring payments`}
+          hint={`${data.recurring.filter((r) => r.status === "active").length} subscriptions & bills`}
           icon="🔁"
           href="/app/recurring"
         />
@@ -154,45 +155,56 @@ export default async function DashboardPage({
 
       {/* ── Insights strip ─────────────────────────────────────────── */}
       {data.insights.length > 0 && (
-        <div className="grid gap-4 lg:grid-cols-3">
-          {data.insights.slice(0, 3).map((insight) => (
-            <Card key={insight.id} hover className="px-5 py-4">
-              <div className="flex items-start gap-3">
-                <span aria-hidden="true" className="mt-0.5 text-lg leading-none">
-                  {insight.icon}
-                </span>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-semibold text-fg">{insight.title}</h3>
-                    <Badge tone={TONE_MAP[insight.tone]}>
-                      {insight.tone === "critical"
-                        ? "Needs attention"
-                        : insight.tone === "warning"
-                          ? "Worth a look"
-                          : insight.tone === "positive"
-                            ? "Good news"
-                            : "FYI"}
-                    </Badge>
-                  </div>
-                  <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-muted">
-                    {insight.detail}
-                  </p>
-                  {insight.href && (
-                    <Link
-                      href={insight.href}
-                      className="mt-2 inline-block text-xs font-medium text-brand hover:underline"
-                    >
-                      Take a look →
-                    </Link>
-                  )}
+        <section aria-label="What stands out this month">
+          <SectionLabel>What stands out</SectionLabel>
+          <div className="grid items-stretch gap-4 lg:grid-cols-3">
+            {data.insights.slice(0, 3).map((insight) => (
+              <Card key={insight.id} hover className="flex h-full flex-col px-5 py-4">
+                {/* Badge is pinned to its own row above the heading rather than
+                    sitting inline: inline, a long title pushes it onto a second
+                    line on some cards and not others, and the row reads ragged. */}
+                <div className="mb-2 flex items-center gap-2">
+                  <span
+                    aria-hidden="true"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-sm"
+                  >
+                    {insight.icon}
+                  </span>
+                  <Badge tone={TONE_MAP[insight.tone]}>
+                    {insight.tone === "critical"
+                      ? "Needs attention"
+                      : insight.tone === "warning"
+                        ? "Worth a look"
+                        : insight.tone === "positive"
+                          ? "Good news"
+                          : "FYI"}
+                  </Badge>
                 </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+
+                <h3 className="text-[0.9375rem] font-semibold leading-snug text-fg">
+                  {insight.title}
+                </h3>
+                <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-muted">
+                  {insight.detail}
+                </p>
+
+                {insight.href && (
+                  <Link
+                    href={insight.href}
+                    className="mt-auto pt-3 text-xs font-semibold text-brand hover:underline"
+                  >
+                    Take a look →
+                  </Link>
+                )}
+              </Card>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* ── Trend + breakdown ──────────────────────────────────────── */}
+      <section aria-label="Spending overview">
+        <SectionLabel>Where the money goes</SectionLabel>
       <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
         <Card>
           <CardHeader
@@ -268,8 +280,11 @@ export default async function DashboardPage({
           </div>
         </Card>
       </div>
+      </section>
 
       {/* ── Budgets + upcoming ─────────────────────────────────────── */}
+      <section aria-label="Budgets and upcoming payments">
+        <SectionLabel>Staying on track</SectionLabel>
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader
@@ -377,22 +392,59 @@ export default async function DashboardPage({
           </div>
         </Card>
       </div>
+      </section>
 
-      {/* ── Daily rhythm ───────────────────────────────────────────── */}
-      <Card>
-        <CardHeader
-          title="Daily spending rhythm"
-          subtitle={`Every day in ${formatMonth(month)} — darker squares cost more`}
-        />
-        <div className="px-5 py-4">
-          <CalendarHeatmap
-            days={data.daily.map((d) => ({ date: d.date, totalMinor: d.total }))}
-            from={`${month}-01`}
-            to={data.isCurrent ? new Date().toISOString().slice(0, 10) : `${month}-28`}
-            currency={cur}
+      {/* ── Daily rhythm + biggest merchants ───────────────────────── */}
+      {/* A single month's heatmap is only five columns wide, so on its own it
+          left a full-width card mostly empty. Pairing it with the merchant
+          ranking fills the row and puts two views of the same month together. */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="flex flex-col">
+          <CardHeader
+            title="Daily spending rhythm"
+            subtitle={`Every day in ${formatMonth(month)} — darker squares cost more`}
           />
-        </div>
-      </Card>
+          <div className="flex flex-1 items-center px-5 py-4">
+            <CalendarHeatmap
+              days={data.daily.map((d) => ({ date: d.date, totalMinor: d.total }))}
+              from={`${month}-01`}
+              to={data.isCurrent ? new Date().toISOString().slice(0, 10) : `${month}-28`}
+              currency={cur}
+            />
+          </div>
+        </Card>
+
+        <Card className="flex flex-col">
+          <CardHeader
+            title="Biggest merchants"
+            subtitle={`Where most of ${formatMonth(month, true)} actually went`}
+            action={
+              <Link href="/app/insights" className="btn btn-ghost text-xs">
+                More →
+              </Link>
+            }
+          />
+          <div className="flex-1 px-5 py-4">
+            {data.topMerchants.length ? (
+              <RankedBars
+                withIcons={false}
+                currency={cur}
+                items={data.topMerchants.slice(0, 6).map((m) => ({
+                  label: merchantLabel(m.merchant),
+                  valueMinor: m.total,
+                  count: m.n,
+                  share: m.total / Math.max(1, data.kpis.spendMinor),
+                  href: `/app/transactions?q=${encodeURIComponent(m.merchant)}`,
+                }))}
+              />
+            ) : (
+              <p className="py-6 text-center text-sm text-subtle">
+                No merchant data for this month.
+              </p>
+            )}
+          </div>
+        </Card>
+      </div>
 
       {/* ── Recent transactions ────────────────────────────────────── */}
       <Card>

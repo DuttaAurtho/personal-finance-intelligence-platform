@@ -87,11 +87,17 @@ export function StatTile({
         : "text-[var(--viz-critical)]";
 
   const body = (
-    <div className="card card-lift h-full px-5 py-4 transition-colors">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.8125rem] font-medium text-muted">
+    <div
+      className={`card card-lift flex h-full min-h-[8.25rem] flex-col px-5 py-4 transition-colors ${
+        hero ? "ring-1 ring-brand/20" : ""
+      } ${href ? "card-hover" : ""}`}
+    >
+      {/* Label row — a fixed-height band so every tile's value starts on the
+          same baseline regardless of whether it carries a sparkline. */}
+      <div className="flex min-h-6 items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-[0.8125rem] font-medium text-muted">
           {icon && (
-            <span aria-hidden="true" className="mr-1.5">
+            <span aria-hidden="true" className="text-sm leading-none">
               {icon}
             </span>
           )}
@@ -107,18 +113,20 @@ export function StatTile({
 
       <p
         className={`mt-2 font-semibold tracking-tight text-fg ${
-          hero ? "text-4xl sm:text-[2.75rem] sm:leading-[1.1]" : "text-2xl"
+          hero ? "text-[2.5rem] leading-[1.1] sm:text-[2.75rem]" : "text-[1.75rem] leading-tight"
         }`}
       >
         {value}
       </p>
 
-      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[0.8125rem]">
+      {/* Pushed to the bottom so the footnote line sits flush across the row. */}
+      <div className="mt-auto pt-2.5 text-[0.8125rem] leading-snug">
         {delta && (
           <span className={`font-medium ${deltaColor}`}>
             <span aria-hidden="true">{arrow}</span> {delta.text}
           </span>
         )}
+        {delta && hint && <span className="mx-1.5 text-line-strong">·</span>}
         {hint && <span className="text-subtle">{hint}</span>}
       </div>
     </div>

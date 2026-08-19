@@ -413,9 +413,18 @@ export default async function LandingPage() {
       <footer className="relative z-10 border-t border-line/60 py-10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 sm:flex-row">
           <Logo size={22} />
-          <p className="text-sm text-subtle">
-            Personal Finance Intelligence Platform · built with Next.js and SQLite
-          </p>
+          <div className="text-center text-sm text-subtle sm:text-left">
+            <p>Personal Finance Intelligence Platform · built with Next.js and SQLite</p>
+            <p className="mt-1">
+              Made by <span className="font-medium text-muted">Aurtho Dutta</span> ·{" "}
+              <a
+                href="mailto:dutta.aurtho@gmail.com"
+                className="font-medium text-brand hover:underline"
+              >
+                dutta.aurtho@gmail.com
+              </a>
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             <Link href="/login" className="btn btn-ghost">Sign in</Link>
             <ThemeToggle compact />

@@ -53,6 +53,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </button>
             </form>
           </div>
+
+          <p className="border-t border-line px-1 pt-3 text-[0.6875rem] leading-relaxed text-subtle">
+            Made by <span className="font-medium text-muted">Aurtho Dutta</span>
+            <br />
+            <a
+              href="mailto:dutta.aurtho@gmail.com"
+              className="hover:text-brand hover:underline"
+            >
+              dutta.aurtho@gmail.com
+            </a>
+          </p>
         </div>
       </aside>
 

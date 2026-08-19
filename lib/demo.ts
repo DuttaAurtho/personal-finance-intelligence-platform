@@ -11,8 +11,9 @@ import { importTransactions, setBudgets, suggestBudgets } from "./repository";
  * pay rise, a Netflix price increase, a cancelled gym membership and a couple
  * of genuine outliers — the exact patterns the detection modules exist to find.
  *
- * A seeded PRNG makes every run reproducible, so a bug seen in the demo can be
- * reproduced exactly.
+ * A seeded PRNG drives all of it: pass the same seed and you get exactly the
+ * same history back, which keeps bugs reproducible, while each new account is
+ * given its own seed so no two demos look alike.
  */
 
 /** Mulberry32 — small, fast, and good enough for generating fixtures. */
@@ -110,9 +111,27 @@ export function generateDemoTransactions(months = 24, seed = 20260318): ParsedRo
   const thisMonth = monthKey(today);
   const startMonth = addMonths(thisMonth, -(months - 1));
 
+  /* ── The household ────────────────────────────────────────────────
+     Drawn from the seed rather than hard-coded, so two accounts don't
+     just differ in their random noise — they have different rent, pay
+     and bills, which is what stops every demo looking like a copy of
+     the last one. Ranges are chosen to stay plausible for one person. */
+  const rent = Math.round(between(g, 780, 1650) / 5) * 5;
+  const councilTax = Math.round(between(g, 95, 215) * 2) / 2;
+  const energyBase = Math.round(between(g, 42, 88));
+  const waterBill = Math.round(between(g, 22, 46) * 10) / 10;
+  const broadband = Math.round(between(g, 24, 46));
+  const mobile = Math.round(between(g, 8, 34));
+  const contentsInsurance = Math.round(between(g, 8, 26) * 100) / 100;
+  const savingsTransfer = Math.round(between(g, 120, 520) / 10) * 10;
+  const investTransfer = Math.round(between(g, 50, 350) / 10) * 10;
+  const payDay = Math.round(between(g, 24, 28));
+
   // Salary rises once, roughly two-thirds of the way through the history.
   const raiseAt = Math.floor(months * 0.65);
-  let salary = 3180;
+  const baseSalary = Math.round(between(g, 2350, 4600) / 10) * 10;
+  const raisedSalary = Math.round((baseSalary * between(g, 1.06, 1.16)) / 10) * 10;
+  let salary = baseSalary;
 
   // Netflix puts its price up at a fixed point so the price-rise detector has
   // something real to find.
@@ -130,8 +149,7 @@ export function generateDemoTransactions(months = 24, seed = 20260318): ParsedRo
     const within = (day: number) => day <= lastDay;
 
     /* ── Income ──────────────────────────────────────────────── */
-    if (i === raiseAt) salary = 3560;
-    const payDay = 25;
+    if (i === raiseAt) salary = raisedSalary;
     if (within(payDay)) {
       push(g, dayIn(month, payDay), "ACME ANALYTICS LTD SALARY", salary + between(g, -12, 12));
     }
@@ -143,16 +161,16 @@ export function generateDemoTransactions(months = 24, seed = 20260318): ParsedRo
     if (within(28)) push(g, dayIn(month, 28), "GROSS INTEREST PAID", between(g, 3, 14));
 
     /* ── Fixed commitments ───────────────────────────────────── */
-    if (within(1)) push(g, dayIn(month, 1), "RENT PAYMENT LANDLORD", -1250);
-    if (within(3)) push(g, dayIn(month, 3), "CAMDEN COUNCIL TAX", -168.5);
+    if (within(1)) push(g, dayIn(month, 1), "RENT PAYMENT LANDLORD", -rent);
+    if (within(3)) push(g, dayIn(month, 3), "CAMDEN COUNCIL TAX", -councilTax);
 
     // Energy follows the weather: dear in winter, cheap in summer.
     const seasonal = 1 + 0.55 * Math.cos(((monthNum - 1) / 12) * 2 * Math.PI);
-    if (within(6)) push(g, dayIn(month, 6), "OCTOPUS ENERGY LTD", -(62 * seasonal + between(g, -6, 6)));
-    if (within(8)) push(g, dayIn(month, 8), "THAMES WATER UTILITIES", -34.2);
-    if (within(10)) push(g, dayIn(month, 10), "HYPEROPTIC BROADBAND", -32);
-    if (within(12)) push(g, dayIn(month, 12), "VODAFONE LTD MOBILE", -24);
-    if (within(14)) push(g, dayIn(month, 14), "ADMIRAL INSURANCE CONTENTS", -14.99);
+    if (within(6)) push(g, dayIn(month, 6), "OCTOPUS ENERGY LTD", -(energyBase * seasonal + between(g, -6, 6)));
+    if (within(8)) push(g, dayIn(month, 8), "THAMES WATER UTILITIES", -waterBill);
+    if (within(10)) push(g, dayIn(month, 10), "HYPEROPTIC BROADBAND", -broadband);
+    if (within(12)) push(g, dayIn(month, 12), "VODAFONE LTD MOBILE", -mobile);
+    if (within(14)) push(g, dayIn(month, 14), "ADMIRAL INSURANCE CONTENTS", -contentsInsurance);
 
     /* ── Subscriptions ───────────────────────────────────────── */
     if (within(2)) push(g, dayIn(month, 2), "NETFLIX.COM", -(i >= netflixRiseAt ? 17.99 : 15.99));
@@ -163,8 +181,8 @@ export function generateDemoTransactions(months = 24, seed = 20260318): ParsedRo
     if (i >= Math.floor(months * 0.4) && within(11)) push(g, dayIn(month, 11), "OPENAI *CHATGPT SUBSCR", -20);
 
     /* ── Savings & investments (transfers, not spending) ─────── */
-    if (within(26)) push(g, dayIn(month, 26), "TRANSFER TO SAVINGS POT", -(i >= raiseAt ? 450 : 300));
-    if (within(26)) push(g, dayIn(month, 26), "VANGUARD INVESTMENTS DD", -200);
+    if (within(26)) push(g, dayIn(month, 26), "TRANSFER TO SAVINGS POT", -(i >= raiseAt ? savingsTransfer * 1.4 : savingsTransfer));
+    if (within(26)) push(g, dayIn(month, 26), "VANGUARD INVESTMENTS DD", -investTransfer);
 
     /* ── Groceries: roughly weekly ───────────────────────────── */
     const shops = Math.round(between(g, 5, 9));
@@ -255,9 +273,22 @@ export function generateDemoTransactions(months = 24, seed = 20260318): ParsedRo
   return g.rows.sort((a, b) => a.date.localeCompare(b.date));
 }
 
-/** Populate a fresh demo account and give it sensible budgets. */
-export async function seedDemoData(userId: number, accountId: number, months = 24) {
-  const rows = generateDemoTransactions(months);
+/**
+ * Populate a fresh demo account and give it sensible budgets.
+ *
+ * The seed is derived per account rather than left at its default, so two
+ * people trying the demo — or one person creating a second account — don't
+ * get byte-identical histories and conclude the app is showing them somebody
+ * else's data. Mixing in the clock as well as the id means re-seeding the
+ * same account after a wipe also produces a fresh history.
+ */
+export async function seedDemoData(
+  userId: number,
+  accountId: number,
+  months = 24,
+  seed = (Math.imul(userId || 1, 2654435761) ^ Date.now()) >>> 0,
+) {
+  const rows = generateDemoTransactions(months, seed);
   const summary = await importTransactions(userId, accountId, "demo-statement.csv", rows);
 
   // Budgets derived from the generated history, so they're realistic and the

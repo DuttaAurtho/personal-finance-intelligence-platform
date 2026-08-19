@@ -176,6 +176,8 @@ export const MERCHANT_LEXICON: Record<string, string> = {
 
   /* ── Shopping ────────────────────────────────────────────── */
   amazon: "Shopping",
+  amzn: "Shopping",
+  amz: "Shopping",
   ebay: "Shopping",
   etsy: "Shopping",
   argos: "Shopping",

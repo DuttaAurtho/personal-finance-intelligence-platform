@@ -23,7 +23,7 @@ import { dayOfWeek } from "./dates";
 /** Payment-processor prefixes that hide the real merchant behind an asterisk. */
 const PROCESSORS = new Set([
   "sq", "sqc", "paypal", "pp", "sumup", "iz", "ztl", "zettle", "stripe",
-  "wpy", "worldpay", "tfl", "www", "amzn", "amz", "gum", "eventbrite",
+  "wpy", "worldpay", "www", "gum", "eventbrite",
 ]);
 
 /** Banking noise that carries no merchant information. */
@@ -62,13 +62,26 @@ export function normalizeDescription(raw: string): string {
   if (!raw) return "";
   let s = String(raw).toLowerCase().trim();
 
-  // Take the merchant that sits after a processor prefix: "sq *the archive"
+  // Take the merchant that sits after a processor prefix: "sq *the archive".
+  //
+  // The prefix is only dropped when it is a payment processor and not itself a
+  // merchant we recognise. Treating every short prefix as a processor threw
+  // away the real merchant in cases like "UBER *TRIP", where the useful half is
+  // the prefix and the suffix ("trip") identifies nothing.
   if (s.includes("*")) {
     const [head, ...rest] = s.split("*");
     const tail = rest.join(" ").trim();
     const headKey = head.trim().replace(/[^a-z]/g, "");
-    if (tail && (PROCESSORS.has(headKey) || headKey.length <= 4)) s = tail;
-    else s = s.replace(/\*/g, " ");
+    const headIsKnownMerchant = headKey.length >= 3 && MERCHANT_LEXICON[headKey] !== undefined;
+
+    // A known processor always yields to what follows it — "paypal *steam" is
+    // Steam, even though PayPal is itself in the lexicon for bare transfers.
+    // The short-prefix fallback is the guess, so that one defers to the lexicon.
+    if (tail && (PROCESSORS.has(headKey) || (headKey.length <= 4 && !headIsKnownMerchant))) {
+      s = tail;
+    } else {
+      s = s.replace(/\*/g, " ");
+    }
   }
 
   for (const re of NOISE) s = s.replace(re, " ");

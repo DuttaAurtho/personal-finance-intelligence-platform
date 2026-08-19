@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { randomBytes } from "node:crypto";
 import {
   authenticate,
@@ -53,6 +54,7 @@ export async function signUp(_prev: FormState, formData: FormData): Promise<Form
   if (wantsDemo) await seedDemoData(userId, account.id);
 
   await startSession(userId);
+  revalidatePath("/", "layout");
   redirect("/app");
 }
 
@@ -67,11 +69,15 @@ export async function signIn(_prev: FormState, formData: FormData): Promise<Form
 
   await ensureUserSetup(user.id);
   await startSession(user.id);
+  // Without this, the router can serve the previous session's rendered /app
+  // from cache and the new user briefly sees somebody else's figures.
+  revalidatePath("/", "layout");
   redirect("/app");
 }
 
 export async function signOut(): Promise<void> {
   await endSession();
+  revalidatePath("/", "layout");
   redirect("/");
 }
 
@@ -94,6 +100,7 @@ export async function startDemo(): Promise<void> {
   await seedDemoData(user.id, account.id);
 
   await startSession(user.id);
+  revalidatePath("/", "layout");
   redirect("/app");
 }
 
