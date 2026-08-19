@@ -175,11 +175,16 @@ export function validateEmail(email: string): string | null {
   return null;
 }
 
+/**
+ * Deliberately permissive: any six characters will do, no character-class
+ * rules. This is a self-hosted tool where the account exists only to keep one
+ * person's data separate from another's — there is nothing to steal beyond
+ * what the user themselves imported, and complexity rules mostly succeed at
+ * annoying people into reusing a password they already use elsewhere.
+ */
 export function validatePassword(password: string): string | null {
   if (!password) return "Password is required.";
-  if (password.length < 8) return "Use at least 8 characters.";
+  if (password.length < 6) return "Use at least 6 characters.";
   if (password.length > 200) return "That password is too long.";
-  if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password))
-    return "Include at least one letter and one number.";
   return null;
 }

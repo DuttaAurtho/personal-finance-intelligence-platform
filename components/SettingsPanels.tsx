@@ -2,7 +2,7 @@
 
 import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CURRENCIES } from "@/lib/money";
+import { CURRENCY_OPTIONS } from "@/lib/money";
 import { categoryIcon } from "@/lib/categories";
 import { updateProfile, retrainClassifier, type SettingsState } from "@/app/actions/settings";
 import { addRule, removeRule, type ManualState } from "@/app/actions/transactions";
@@ -42,8 +42,8 @@ export function ProfilePanel({ name, currency }: { name: string; currency: strin
         <div>
           <label className="label" htmlFor="currency">Currency</label>
           <select id="currency" name="currency" defaultValue={currency} className="input">
-            {CURRENCIES.map((c) => (
-              <option key={c} value={c}>{c}</option>
+            {CURRENCY_OPTIONS.map((c) => (
+              <option key={c.code} value={c.code}>{c.label}</option>
             ))}
           </select>
           <p className="mt-1 text-xs text-subtle">

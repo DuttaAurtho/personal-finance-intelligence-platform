@@ -4,10 +4,12 @@
  */
 
 const SYMBOLS: Record<string, string> = {
+  BDT: "৳",
   GBP: "£",
   USD: "$",
   EUR: "€",
   INR: "₹",
+  PKR: "₨",
   JPY: "¥",
   AUD: "A$",
   CAD: "C$",
@@ -16,11 +18,37 @@ const SYMBOLS: Record<string, string> = {
   ZAR: "R",
   SEK: "kr ",
   NGN: "₦",
-  BDT: "৳",
-  PKR: "₨",
+};
+
+/** Full display names, so the picker reads "৳ BDT — Bangladeshi Taka". */
+const CURRENCY_NAMES: Record<string, string> = {
+  BDT: "Bangladeshi Taka",
+  GBP: "British Pound",
+  USD: "US Dollar",
+  EUR: "Euro",
+  INR: "Indian Rupee",
+  PKR: "Pakistani Rupee",
+  JPY: "Japanese Yen",
+  AUD: "Australian Dollar",
+  CAD: "Canadian Dollar",
+  CHF: "Swiss Franc",
+  NZD: "New Zealand Dollar",
+  ZAR: "South African Rand",
+  SEK: "Swedish Krona",
+  NGN: "Nigerian Naira",
 };
 
 export const CURRENCIES = Object.keys(SYMBOLS);
+
+export function currencyName(code: string): string {
+  return CURRENCY_NAMES[code] ?? code;
+}
+
+/** `{code, label}` pairs for a currency `<select>`. */
+export const CURRENCY_OPTIONS = CURRENCIES.map((code) => ({
+  code,
+  label: `${symbolFor(code).trim()} ${code} — ${currencyName(code)}`,
+}));
 
 export function symbolFor(currency: string): string {
   return SYMBOLS[currency] ?? currency + " ";

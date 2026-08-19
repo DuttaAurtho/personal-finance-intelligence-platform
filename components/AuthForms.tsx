@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { signIn, signUp, type FormState } from "@/app/actions/auth";
-import { CURRENCIES } from "@/lib/money";
+import { CURRENCY_OPTIONS } from "@/lib/money";
 
 const INITIAL: FormState = {};
 
@@ -114,16 +114,16 @@ export function SignUpForm() {
           required
           minLength={8}
           className="input"
-          placeholder="At least 8 characters"
+          placeholder="At least 6 characters"
           aria-invalid={state.field === "password"}
         />
       </div>
 
       <div>
         <label className="label" htmlFor="currency">Currency</label>
-        <select id="currency" name="currency" className="input" defaultValue="GBP">
-          {CURRENCIES.map((c) => (
-            <option key={c} value={c}>{c}</option>
+        <select id="currency" name="currency" className="input" defaultValue="BDT">
+          {CURRENCY_OPTIONS.map((c) => (
+            <option key={c.code} value={c.code}>{c.label}</option>
           ))}
         </select>
       </div>

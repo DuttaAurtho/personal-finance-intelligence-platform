@@ -30,7 +30,40 @@ import path from "node:path";
  */
 
 const isRemote = !!process.env.TURSO_DATABASE_URL;
-const LOCAL_DB_PATH = process.env.FISCORA_DB ?? path.join(process.cwd(), "data", "fiscora.db");
+
+/** True on Vercel/Lambda, where the bundle directory is read-only. */
+const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+
+/**
+ * Where the local SQLite file lives when no hosted database is configured.
+ *
+ * On a serverless host the deployment directory is read-only, so writing to
+ * `./data` throws ENOENT and takes the whole app down — which is exactly what
+ * happens if someone deploys this without setting TURSO_DATABASE_URL. `/tmp`
+ * is the one writable path there, so falling back to it keeps the app *working*
+ * rather than erroring out. That storage is per-instance and wiped between cold
+ * starts, so it is genuinely only good enough for kicking the tyres on the demo;
+ * `warnIfEphemeral()` below makes sure nobody mistakes it for durable storage.
+ */
+function resolveLocalDbPath(): string {
+  if (process.env.FISCORA_DB) return process.env.FISCORA_DB;
+  if (isServerless) return path.join("/tmp", "fiscora.db");
+  return path.join(process.cwd(), "data", "fiscora.db");
+}
+
+const LOCAL_DB_PATH = resolveLocalDbPath();
+
+/** True when data will not survive — no hosted DB, and only a scratch disk. */
+export const isEphemeralStorage = !isRemote && isServerless;
+
+if (isEphemeralStorage) {
+  console.warn(
+    "[fiscora] TURSO_DATABASE_URL is not set, so this deployment is falling back " +
+      "to a temporary SQLite file in /tmp. It will work, but every account and " +
+      "transaction is wiped whenever the serverless instance recycles. Set " +
+      "TURSO_DATABASE_URL and TURSO_AUTH_TOKEN for persistent storage.",
+  );
+}
 
 declare global {
   // eslint-disable-next-line no-var

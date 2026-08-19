@@ -35,6 +35,7 @@ export default async function SettingsPage() {
   ]);
   const confirmed = confirmedRow?.n ?? 0;
   const isRemote = !!process.env.TURSO_DATABASE_URL;
+  const isEphemeral = !isRemote && !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
 
   const byKind = {
     expense: categories.filter((c) => c.kind === "expense"),
@@ -109,7 +110,11 @@ export default async function SettingsPage() {
               <div className="flex items-center justify-between py-2.5">
                 <dt className="text-muted">Stored at</dt>
                 <dd className="font-mono text-xs text-fg">
-                  {isRemote ? "hosted libSQL database" : "data/fiscora.db"}
+                  {isRemote
+                    ? "hosted libSQL database"
+                    : isEphemeral
+                      ? "/tmp (temporary)"
+                      : "data/fiscora.db"}
                 </dd>
               </div>
             </dl>

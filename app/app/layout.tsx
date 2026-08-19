@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { signOut } from "@/app/actions/auth";
 import { ensureUserSetup } from "@/lib/repository";
 import { countTransactions } from "@/lib/analytics";
+import { isEphemeralStorage } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +82,25 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       {/* ── Content ────────────────────────────────────────────────── */}
       <main className="lg:pl-60">
-        <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">{children}</div>
+        <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8">
+          {isEphemeralStorage && (
+            <div
+              role="status"
+              className="mb-5 flex items-start gap-3 rounded-[var(--radius)] border border-warning/40 bg-warning-soft px-4 py-3"
+            >
+              <span aria-hidden="true" className="mt-0.5 text-base leading-none">⚠️</span>
+              <p className="text-[0.8125rem] leading-relaxed text-fg">
+                <strong className="font-semibold">This deployment isn&apos;t saving data permanently.</strong>{" "}
+                No hosted database is configured, so everything is being written to temporary
+                storage and will disappear when the server restarts. Fine for trying the demo —
+                set <code className="rounded bg-surface-3 px-1 py-0.5 font-mono text-xs">TURSO_DATABASE_URL</code>{" "}
+                and <code className="rounded bg-surface-3 px-1 py-0.5 font-mono text-xs">TURSO_AUTH_TOKEN</code>{" "}
+                to keep your data.
+              </p>
+            </div>
+          )}
+          {children}
+        </div>
       </main>
     </div>
   );

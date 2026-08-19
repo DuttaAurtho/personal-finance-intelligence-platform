@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // node:sqlite is a built-in module — keep it out of the bundler graph.
-  serverExternalPackages: [],
+  // The libSQL client ships a native binary for its local-file driver, which
+  // a bundler cannot inline. Marking it external leaves it in node_modules so
+  // the deployment traces the real binary instead of producing a bundle that
+  // fails to load at runtime.
+  serverExternalPackages: ["@libsql/client", "libsql"],
   experimental: {
     // Server Actions handle CSV uploads; allow a generous body for big statements.
     serverActions: { bodySizeLimit: "12mb" },
