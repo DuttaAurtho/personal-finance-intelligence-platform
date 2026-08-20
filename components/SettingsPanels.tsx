@@ -3,7 +3,7 @@
 import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CURRENCY_OPTIONS } from "@/lib/money";
-import { categoryIcon } from "@/lib/categories";
+import CategoryIcon from "@/components/CategoryIcon";
 import { updateProfile, retrainClassifier, type SettingsState } from "@/app/actions/settings";
 import { addRule, removeRule, type ManualState } from "@/app/actions/transactions";
 
@@ -126,7 +126,7 @@ export function RulesPanel({
                 </code>
                 <span className="mx-2 text-subtle">→</span>
                 <span className="text-fg">
-                  <span aria-hidden="true" className="mr-1">{categoryIcon(r.category)}</span>
+                  <CategoryIcon category={r.category} />
                   {r.category}
                 </span>
               </span>

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { categoryIcon } from "@/lib/categories";
+import CategoryIcon from "@/components/CategoryIcon";
 import { formatMoney, symbolFor } from "@/lib/money";
 import { clearBudget, saveBudget } from "@/app/actions/budgets";
 import type { BudgetStatus } from "@/lib/analytics";
@@ -72,7 +72,7 @@ export default function BudgetEditor({ budgets, suggestions, currency, monthLabe
               <li key={b.category} className="px-5 py-4">
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
                   <span className="flex items-center gap-2 text-sm font-semibold text-fg">
-                    <span aria-hidden="true">{categoryIcon(b.category)}</span>
+                    <CategoryIcon category={b.category} />
                     {b.category}
                   </span>
 
@@ -189,7 +189,7 @@ export default function BudgetEditor({ budgets, suggestions, currency, monthLabe
                   className="btn btn-secondary h-8 text-xs"
                   title={`Typical month: ${formatMoney(s.basis, currency)}`}
                 >
-                  <span aria-hidden="true">{categoryIcon(s.category)}</span>
+                  <CategoryIcon category={s.category} />
                   {s.category}
                   <span className="font-semibold">{formatMoney(s.amountMinor, currency)}</span>
                   <span aria-hidden="true" className="text-subtle">+</span>

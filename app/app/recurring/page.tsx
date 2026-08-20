@@ -5,7 +5,7 @@ import { allTransactions } from "@/lib/analytics";
 import { detectRecurring, monthlyCommitment, priceIncreases, upcoming } from "@/lib/recurring";
 import { formatDate, relativeDay } from "@/lib/dates";
 import { formatMoney, formatPercent } from "@/lib/money";
-import { categoryIcon } from "@/lib/categories";
+import CategoryIcon from "@/components/CategoryIcon";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, StatTile } from "@/components/ui";
 import type { RecurringSeries } from "@/lib/types";
 
@@ -52,7 +52,6 @@ export default async function RecurringPage() {
         />
         <Card>
           <EmptyState
-            icon="🔁"
             title="No recurring payments found yet"
             description="Detection needs at least three payments to the same merchant on a consistent rhythm. Import a few more months of history and they'll start appearing."
             action={
@@ -80,7 +79,6 @@ export default async function RecurringPage() {
           label="Committed every month"
           value={formatMoney(commitment, cur)}
           hint={`${formatMoney(commitment * 12, cur)} a year`}
-          icon="🔁"
         />
         <StatTile
           label="Active subscriptions"
@@ -91,7 +89,6 @@ export default async function RecurringPage() {
           label="Due in 30 days"
           value={formatMoney(dueSoonTotal, cur)}
           hint={`${dueSoon.length} payments`}
-          icon="📅"
         />
         <StatTile
           label="Price rises spotted"
@@ -107,7 +104,6 @@ export default async function RecurringPage() {
                 )} more a year`
               : "nothing has gone up"
           }
-          icon={rises.length ? "⚠️" : "✓"}
         />
       </div>
 
@@ -182,10 +178,10 @@ export default async function RecurringPage() {
                     </p>
                   </td>
                   <td className="whitespace-nowrap text-muted">
-                    <span aria-hidden="true" className="mr-1.5">
-                      {categoryIcon(s.category)}
+                    <span className="inline-flex items-center gap-1.5">
+                      <CategoryIcon category={s.category} />
+                      {s.category}
                     </span>
-                    {s.category}
                   </td>
                   <td className="whitespace-nowrap text-muted">
                     {CADENCE_LABEL[s.cadence]}

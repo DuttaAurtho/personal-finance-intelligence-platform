@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { formatDate } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
-import { categoryIcon } from "@/lib/categories";
+import CategoryIcon from "@/components/CategoryIcon";
 import type { Transaction } from "@/lib/types";
 import {
   removeTransactions,
@@ -11,6 +11,7 @@ import {
   updateCategoryForMerchant,
 } from "@/app/actions/transactions";
 import { Badge } from "./ui";
+import TransactionForm, { type EditableTransaction } from "./TransactionForm";
 
 type Row = Transaction & { account_name: string };
 
@@ -34,6 +35,7 @@ export default function TransactionTable({ rows, categories, currency }: Props) 
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [applyAll, setApplyAll] = useState(true);
   const [flash, setFlash] = useState<string | null>(null);
+  const [editing, setEditing] = useState<EditableTransaction | null>(null);
 
   const expense = categories.filter((c) => c.kind === "expense");
   const income = categories.filter((c) => c.kind === "income");
@@ -125,6 +127,7 @@ export default function TransactionTable({ rows, categories, currency }: Props) 
               <th>Category</th>
               <th className="hidden md:table-cell">Account</th>
               <th className="num">Amount</th>
+              <th className="w-10"><span className="sr-only">Edit</span></th>
             </tr>
           </thead>
           <tbody>
@@ -155,7 +158,7 @@ export default function TransactionTable({ rows, categories, currency }: Props) 
 
                 <td>
                   <div className="flex items-center gap-1.5">
-                    <span aria-hidden="true">{categoryIcon(row.category)}</span>
+                    <CategoryIcon category={row.category} />
                     <select
                       value={row.category}
                       onChange={(e) => change(row, e.target.value)}
@@ -206,11 +209,39 @@ export default function TransactionTable({ rows, categories, currency }: Props) 
                 >
                   {formatMoney(row.amount_minor, currency, { signed: row.amount_minor > 0 })}
                 </td>
+
+                <td>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditing({
+                        id: row.id,
+                        date: row.date,
+                        description: row.description,
+                        amount_minor: row.amount_minor,
+                        category: row.category,
+                        notes: row.notes,
+                      })
+                    }
+                    className="btn btn-ghost h-7 !px-2 text-xs"
+                    aria-label={`Edit ${row.description}`}
+                  >
+                    Edit
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <TransactionForm
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        initial={editing}
+        categories={categories}
+        currency={currency}
+      />
     </div>
   );
 }

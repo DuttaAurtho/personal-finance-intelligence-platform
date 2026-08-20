@@ -13,6 +13,7 @@ import {
   setCategoryForMerchant,
   setNotes,
   setTransferFlag,
+  updateTransaction,
 } from "@/lib/repository";
 import { parseAmount } from "@/lib/money";
 import { parseDate } from "@/lib/dates";
@@ -96,11 +97,22 @@ export interface ManualState {
   success?: string;
 }
 
-export async function addTransaction(
+/**
+ * Create or edit one transaction by hand.
+ *
+ * Add and edit share an action because they share a form: the only difference
+ * is whether an `id` came along with it. Keeping them together means the
+ * validation rules can't drift apart between the two paths.
+ */
+export async function saveTransaction(
   _prev: ManualState,
   formData: FormData,
 ): Promise<ManualState> {
   const user = await requireUser();
+
+  const rawId = String(formData.get("id") ?? "").trim();
+  const id = rawId ? Number(rawId) : null;
+  if (rawId && !Number.isInteger(id)) return { error: "That transaction couldn't be identified." };
 
   const date = parseDate(String(formData.get("date") ?? ""));
   if (!date) return { error: "Enter a valid date." };
@@ -109,20 +121,43 @@ export async function addTransaction(
   if (!description) return { error: "Give the transaction a description." };
 
   const raw = parseAmount(String(formData.get("amount") ?? ""));
-  if (raw === null || raw === 0) return { error: "Enter an amount." };
+  if (raw === null) return { error: "Enter an amount, for example 24.99." };
+  if (raw === 0) return { error: "An amount of zero won't tell you anything." };
 
+  // The form carries magnitude and direction separately, so a typed minus sign
+  // can't quietly flip an expense into income.
   const direction = String(formData.get("direction") ?? "out");
   const amountMinor = direction === "in" ? Math.abs(raw) : -Math.abs(raw);
 
-  const category = String(formData.get("category") ?? "").trim() || undefined;
+  const category = String(formData.get("category") ?? "").trim();
+  if (!category) return { error: "Choose a category." };
+
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+
+  if (id) {
+    const changed = await updateTransaction(user.id, id, {
+      date, description, amountMinor, category, notes,
+    });
+    if (!changed) return { error: "That transaction no longer exists." };
+    refresh();
+    return { success: `Updated ${description}.` };
+  }
 
   const accounts = await listAccounts(user.id);
   const accountId = Number(formData.get("account")) || accounts[0]?.id;
   if (!accountId) return { error: "No account to add this to." };
 
   await addManualTransaction(user.id, accountId, { date, description, amountMinor, category });
-  refresh();
+  if (notes) {
+    // addManualTransaction doesn't take notes, so apply them once the row exists.
+    const latest = await get<{ id: number }>(
+      "SELECT id FROM transactions WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+      user.id,
+    );
+    if (latest) await setNotes(user.id, latest.id, notes);
+  }
 
+  refresh();
   return { success: `Added ${description}.` };
 }
 

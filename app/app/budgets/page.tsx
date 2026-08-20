@@ -64,7 +64,6 @@ export default async function BudgetsPage({
             label="Total budgeted"
             value={formatMoney(totalBudget, cur)}
             hint={`across ${budgets.length} categories`}
-            icon="🎯"
           />
           <StatTile
             label="Spent against budgets"
@@ -87,13 +86,11 @@ export default async function BudgetsPage({
                 ? "everything on track"
                 : `${overCount} over · ${riskCount} at risk`
             }
-            icon={overCount + riskCount === 0 ? "✓" : "⚠"}
           />
           <StatTile
             label="Unbudgeted spending"
             value={formatMoney(unbudgetedSpend, cur)}
             hint="categories with no ceiling set"
-            icon="🕳️"
           />
         </div>
       )}
@@ -115,7 +112,6 @@ export default async function BudgetsPage({
 
         {budgets.length === 0 && suggestions.length === 0 ? (
           <EmptyState
-            icon="🎯"
             title="No spending history to budget against yet"
             description="Import a couple of months of transactions and a realistic budget can be proposed for every category."
             action={

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { formatMoney } from "@/lib/money";
-import { categoryIcon } from "@/lib/categories";
+import CategoryIcon from "@/components/CategoryIcon";
 import { MARK, seqColor } from "./primitives";
 
 export interface RankedItem {
@@ -54,9 +54,7 @@ export default function RankedBars({
             <div className="mb-1 flex items-baseline justify-between gap-3">
               <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-fg">
                 {withIcons && (
-                  <span aria-hidden="true" className="text-base leading-none">
-                    {categoryIcon(item.label)}
-                  </span>
+                  <CategoryIcon category={item.label} size={15} className="text-muted" />
                 )}
                 <span className="truncate">{item.label}</span>
                 {item.count !== undefined && (

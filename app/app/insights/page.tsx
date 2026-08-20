@@ -4,7 +4,8 @@ import { requireUser } from "@/lib/auth";
 import { availableMonths, getDashboard } from "@/lib/dashboard";
 import { currentMonth, formatDate, formatMonth } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
-import { categoryIcon } from "@/lib/categories";
+import CategoryIcon from "@/components/CategoryIcon";
+import ToneIcon from "@/components/ToneIcon";
 import { merchantLabel } from "@/lib/categorize";
 import { Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 import MonthPicker from "@/components/MonthPicker";
@@ -50,7 +51,6 @@ export default async function InsightsPage({
         <PageHeader title="Insights" description="What the numbers actually mean." />
         <Card>
           <EmptyState
-            icon="💡"
             title="Nothing to analyse yet"
             description="Import a statement and it will start finding patterns in it."
             action={
@@ -89,11 +89,8 @@ export default async function InsightsPage({
           {data.insights.map((insight) => (
             <Card key={insight.id} hover className="px-5 py-4">
               <div className="flex items-start gap-3">
-                <span
-                  aria-hidden="true"
-                  className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-3 text-lg"
-                >
-                  {insight.icon}
+                <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-3">
+                  <ToneIcon tone={insight.tone} />
                 </span>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -119,7 +116,6 @@ export default async function InsightsPage({
       ) : (
         <Card>
           <EmptyState
-            icon="😌"
             title="Nothing notable this month"
             description="No budget breaches, no unusual charges, no significant category drift. Quiet months are good months."
           />
@@ -151,11 +147,11 @@ export default async function InsightsPage({
                     <td className="whitespace-nowrap text-muted">{formatDate(a.date)}</td>
                     <td className="max-w-[20rem] truncate font-medium text-fg">{a.description}</td>
                     <td className="whitespace-nowrap text-muted">
-                      <span aria-hidden="true" className="mr-1.5">
-                        {categoryIcon(a.category)}
-                      </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <CategoryIcon category={a.category} />
                       {a.category}
-                    </td>
+                    </span>
+                  </td>
                     <td className="num font-semibold text-fg">{formatMoney(a.amountMinor, cur)}</td>
                     <td className="num text-muted">{formatMoney(a.medianMinor, cur)}</td>
                     <td className="num">

@@ -60,8 +60,6 @@ export default async function LandingPage() {
 
   return (
     <div className="relative min-h-screen overflow-hidden">
-      <div className="aurora" aria-hidden="true" />
-
       {/* ── Navigation ────────────────────────────────────────────── */}
       <header className="relative z-20 border-b border-line/60 backdrop-blur-sm">
         <nav className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-5">
@@ -85,23 +83,13 @@ export default async function LandingPage() {
 
       {/* ── Hero ──────────────────────────────────────────────────── */}
       <section className="relative z-10">
-        <div className="grid-lines absolute inset-0 -z-10" aria-hidden="true" />
         <div className="mx-auto max-w-5xl px-5 pb-20 pt-16 sm:pt-24">
           <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_1fr]">
             <div className="stack-fade">
-              <span className="chip border-line-strong bg-surface text-muted">
-                <span
-                  className="h-1.5 w-1.5 rounded-full"
-                  style={{ background: "var(--viz-good)" }}
-                  aria-hidden="true"
-                />
-                Free and open · {isRemoteDb ? "your own private database" : "runs on your own machine"}
-              </span>
-
-              <h1 className="mt-5 text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-fg sm:text-5xl lg:text-[3.4rem]">
+              <h1 className="text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-fg sm:text-5xl lg:text-[3.4rem]">
                 Your bank tells you the <span className="text-brand">balance</span>.
                 <br />
-                This tells you the <span className="text-gradient">story</span>.
+                This tells you the <span className="text-brand">story</span>.
               </h1>
 
               <p className="mt-5 max-w-md text-pretty text-base leading-relaxed text-muted sm:text-lg">
@@ -128,16 +116,7 @@ export default async function LandingPage() {
 
             {/* Product preview built from the real components */}
             <div className="relative">
-              <div
-                className="absolute -inset-6 -z-10 rounded-[2rem] opacity-60 blur-2xl"
-                style={{
-                  background:
-                    "radial-gradient(60% 60% at 50% 30%, color-mix(in oklab, var(--brand) 22%, transparent), transparent)",
-                }}
-                aria-hidden="true"
-              />
-
-              <div className="card card-lift overflow-hidden">
+              <div className="card overflow-hidden">
                 <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
                   <div>
                     <p className="text-xs font-medium text-muted">March 2026 spending</p>

@@ -5,7 +5,7 @@ import { getDashboard } from "@/lib/dashboard";
 import { backtestSeries } from "@/lib/forecast";
 import { formatMonth } from "@/lib/dates";
 import { formatMoney, formatPercentAbs } from "@/lib/money";
-import { categoryIcon } from "@/lib/categories";
+import CategoryIcon from "@/components/CategoryIcon";
 import { Card, CardHeader, EmptyState, InfoHint, PageHeader, StatTile } from "@/components/ui";
 import TrendChart from "@/components/charts/TrendChart";
 import BacktestChart from "@/components/charts/BacktestChart";
@@ -41,7 +41,6 @@ export default async function ForecastPage() {
         />
         <Card>
           <EmptyState
-            icon="🔮"
             title="Not enough history to forecast yet"
             description="Forecasting needs at least two complete months, and gets meaningfully better from about six. Import more of your statement history and this page will fill in."
             action={
@@ -113,13 +112,11 @@ export default async function ForecastPage() {
                 ? "average miss per month, walk-forward tested"
                 : "needs more history to measure"
             }
-            icon="🎯"
           />
           <StatTile
             label="Committed spending"
             value={formatMoney(data.commitment, cur)}
             hint="acts as a floor under the forecast"
-            icon="🔁"
             href="/app/recurring"
           />
         </div>

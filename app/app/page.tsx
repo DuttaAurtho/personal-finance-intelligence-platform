@@ -4,7 +4,8 @@ import { requireUser } from "@/lib/auth";
 import { availableMonths, getDashboard } from "@/lib/dashboard";
 import { currentMonth, formatDate, formatMonth, relativeDay } from "@/lib/dates";
 import { formatMoney, formatPercent, formatPercentAbs, pctChange } from "@/lib/money";
-import { categoryIcon } from "@/lib/categories";
+import CategoryIcon from "@/components/CategoryIcon";
+import ToneIcon from "@/components/ToneIcon";
 import { merchantLabel } from "@/lib/categorize";
 import { Badge, Card, CardHeader, EmptyState, SectionLabel, StatTile } from "@/components/ui";
 import MonthPicker from "@/components/MonthPicker";
@@ -41,7 +42,6 @@ export default async function DashboardPage({
     return (
       <Card>
         <EmptyState
-          icon="🚀"
           title="Let's get some data in here"
           description="Import a CSV statement from your bank, or load two years of realistic sample data to see what it does before committing your own numbers."
           action={
@@ -115,7 +115,6 @@ export default async function DashboardPage({
           label="Income"
           value={formatMoney(data.kpis.incomeMinor, cur)}
           hint={`${data.kpis.noSpendDays} no-spend days`}
-          icon="💼"
         />
 
         <StatTile
@@ -141,14 +140,12 @@ export default async function DashboardPage({
               ? "income still arriving this month"
               : undefined
           }
-          icon="⚖️"
         />
 
         <StatTile
           label="Regular bills"
           value={formatMoney(data.commitment, cur)}
           hint={`${data.recurring.filter((r) => r.status === "active").length} subscriptions & bills`}
-          icon="🔁"
           href="/app/recurring"
         />
       </div>
@@ -164,12 +161,7 @@ export default async function DashboardPage({
                     sitting inline: inline, a long title pushes it onto a second
                     line on some cards and not others, and the row reads ragged. */}
                 <div className="mb-2 flex items-center gap-2">
-                  <span
-                    aria-hidden="true"
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-3 text-sm"
-                  >
-                    {insight.icon}
-                  </span>
+                  <ToneIcon tone={insight.tone} />
                   <Badge tone={TONE_MAP[insight.tone]}>
                     {insight.tone === "critical"
                       ? "Needs attention"
@@ -309,7 +301,7 @@ export default async function DashboardPage({
                     <li key={b.category}>
                       <div className="mb-1.5 flex items-baseline justify-between gap-3">
                         <span className="flex items-center gap-2 text-sm font-medium text-fg">
-                          <span aria-hidden="true">{categoryIcon(b.category)}</span>
+                          <CategoryIcon category={b.category} />
                           {b.category}
                         </span>
                         <span className="text-sm tabular-nums text-muted">
@@ -344,7 +336,6 @@ export default async function DashboardPage({
               </ul>
             ) : (
               <EmptyState
-                icon="🎯"
                 title="No budgets yet"
                 description="A budget can be proposed for every category from your own spending history."
                 action={
@@ -473,7 +464,7 @@ export default async function DashboardPage({
                   <td className="max-w-[22rem] truncate font-medium text-fg">{t.description}</td>
                   <td>
                     <span className="inline-flex items-center gap-1.5 text-muted">
-                      <span aria-hidden="true">{categoryIcon(t.category)}</span>
+                      <CategoryIcon category={t.category} />
                       {t.category}
                     </span>
                   </td>

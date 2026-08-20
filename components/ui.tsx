@@ -173,7 +173,7 @@ export function Badge({
 /* ---------------------------------------------------------------------- */
 
 export function EmptyState({
-  icon = "📊",
+  icon,
   title,
   description,
   action,
@@ -185,12 +185,14 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
-      <div
-        aria-hidden="true"
-        className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-3 text-2xl"
-      >
-        {icon}
-      </div>
+      {icon && (
+        <div
+          aria-hidden="true"
+          className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-3 text-2xl"
+        >
+          {icon}
+        </div>
+      )}
       <h3 className="text-base font-semibold text-fg">{title}</h3>
       {description && (
         <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted">{description}</p>

@@ -28,8 +28,6 @@ export default function AuthShell({
 }) {
   return (
     <div className="relative flex min-h-screen">
-      <div className="aurora" aria-hidden="true" />
-
       {/* Form column */}
       <div className="relative z-10 flex w-full flex-col px-5 py-6 lg:w-[52%]">
         <div className="flex items-center justify-between">
@@ -51,8 +49,6 @@ export default function AuthShell({
 
       {/* Brand column — hidden on small screens where it would just be noise */}
       <aside className="relative z-10 hidden border-l border-line/60 bg-surface/40 lg:flex lg:w-[48%] lg:flex-col lg:justify-center lg:px-14">
-        <div className="grid-lines absolute inset-0 -z-10 opacity-60" aria-hidden="true" />
-
         <blockquote className="max-w-md">
           <p className="text-2xl font-semibold leading-snug tracking-tight text-fg">
             &ldquo;You can&apos;t change a spending habit you can&apos;t see.&rdquo;

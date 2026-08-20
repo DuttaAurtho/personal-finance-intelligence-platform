@@ -303,6 +303,46 @@ export async function setCategoryForMerchant(
   return changes;
 }
 
+export interface TransactionEdit {
+  date: string;
+  description: string;
+  amountMinor: number;
+  category: string;
+  notes?: string | null;
+}
+
+/**
+ * Edit an existing transaction outright — date, description, amount, category
+ * and notes. Treated as a confirmation, so an edited row also becomes training
+ * data for the classifier.
+ *
+ * The fingerprint is deliberately left alone. It records what was in the
+ * imported file, not what the row says now; recomputing it would make the same
+ * statement import a second copy of a row the user had merely corrected.
+ */
+export async function updateTransaction(
+  userId: number,
+  transactionId: number,
+  input: TransactionEdit,
+): Promise<number> {
+  const { changes } = await run(
+    `UPDATE transactions
+        SET date = ?, description = ?, merchant = ?, amount_minor = ?,
+            category = ?, notes = ?, confidence = 1.0, is_confirmed = 1, is_transfer = ?
+      WHERE user_id = ? AND id = ?`,
+    input.date,
+    input.description.slice(0, 300),
+    merchantKey(input.description),
+    input.amountMinor,
+    input.category,
+    input.notes?.slice(0, 500) || null,
+    categoryIsTransfer(input.category) ? 1 : 0,
+    userId,
+    transactionId,
+  );
+  return changes;
+}
+
 export function setTransferFlag(userId: number, transactionId: number, isTransfer: boolean): Promise<unknown> {
   return run(
     "UPDATE transactions SET is_transfer = ? WHERE user_id = ? AND id = ?",
