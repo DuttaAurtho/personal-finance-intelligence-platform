@@ -21,7 +21,7 @@ export default function ThemeToggle({ compact = false }: { compact?: boolean }) 
     setDark(next);
     document.documentElement.classList.toggle("dark", next);
     try {
-      localStorage.setItem("fiscora-theme", next ? "dark" : "light");
+      localStorage.setItem("pfip-theme", next ? "dark" : "light");
     } catch {
       /* private mode — the choice just won't persist */
     }

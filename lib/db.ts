@@ -5,7 +5,7 @@ import path from "node:path";
 /**
  * Storage layer, backed by libSQL.
  *
- * Locally this talks to a plain file (`file:./data/fiscora.db`) with zero
+ * Locally this talks to a plain file (`file:./data/pfip.db`) with zero
  * setup and zero cost — the original "runs on your machine" design. Set
  * TURSO_DATABASE_URL / TURSO_AUTH_TOKEN (a free hosted libSQL database from
  * turso.tech) and the exact same code talks to that instead, which is what
@@ -46,9 +46,9 @@ const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NA
  * `warnIfEphemeral()` below makes sure nobody mistakes it for durable storage.
  */
 function resolveLocalDbPath(): string {
-  if (process.env.FISCORA_DB) return process.env.FISCORA_DB;
-  if (isServerless) return path.join("/tmp", "fiscora.db");
-  return path.join(process.cwd(), "data", "fiscora.db");
+  if (process.env.PFIP_DB) return process.env.PFIP_DB;
+  if (isServerless) return path.join("/tmp", "pfip.db");
+  return path.join(process.cwd(), "data", "pfip.db");
 }
 
 const LOCAL_DB_PATH = resolveLocalDbPath();
@@ -58,7 +58,7 @@ export const isEphemeralStorage = !isRemote && isServerless;
 
 if (isEphemeralStorage) {
   console.warn(
-    "[fiscora] TURSO_DATABASE_URL is not set, so this deployment is falling back " +
+    "[pfip] TURSO_DATABASE_URL is not set, so this deployment is falling back " +
       "to a temporary SQLite file in /tmp. It will work, but every account and " +
       "transaction is wiped whenever the serverless instance recycles. Set " +
       "TURSO_DATABASE_URL and TURSO_AUTH_TOKEN for persistent storage.",
@@ -67,10 +67,10 @@ if (isEphemeralStorage) {
 
 declare global {
   // eslint-disable-next-line no-var
-  var __fiscoraClient: Promise<Client> | undefined;
+  var __pfipClient: Promise<Client> | undefined;
 }
 
-async function createFiscoraClient(): Promise<Client> {
+async function createPfipClient(): Promise<Client> {
   if (isRemote) {
     const { createClient } = await import("@libsql/client/web");
     return createClient({
@@ -86,8 +86,8 @@ async function createFiscoraClient(): Promise<Client> {
 
 /** Lazily creates, migrates and caches the connection — every query awaits this first. */
 function client(): Promise<Client> {
-  if (!globalThis.__fiscoraClient) globalThis.__fiscoraClient = createFiscoraClient().then(initSchema);
-  return globalThis.__fiscoraClient;
+  if (!globalThis.__pfipClient) globalThis.__pfipClient = createPfipClient().then(initSchema);
+  return globalThis.__pfipClient;
 }
 
 async function initSchema(c: Client): Promise<Client> {
@@ -335,7 +335,7 @@ export function placeholders(n: number): string {
 
 /** Closes the connection — used by scripts and tests that need a clean exit. */
 export async function closeDb(): Promise<void> {
-  const pending = globalThis.__fiscoraClient;
-  globalThis.__fiscoraClient = undefined;
+  const pending = globalThis.__pfipClient;
+  globalThis.__pfipClient = undefined;
   (await pending)?.close();
 }

@@ -65,7 +65,7 @@ export default async function LandingPage() {
       {/* ── Navigation ────────────────────────────────────────────── */}
       <header className="relative z-20 border-b border-line/60 backdrop-blur-sm">
         <nav className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-5">
-          <Link href="/" aria-label="Fiscora home">
+          <Link href="/" aria-label="Personal Finance Intelligence Platform home">
             <Logo />
           </Link>
 
@@ -101,7 +101,7 @@ export default async function LandingPage() {
               <h1 className="mt-5 text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-fg sm:text-5xl lg:text-[3.4rem]">
                 Your bank tells you the <span className="text-brand">balance</span>.
                 <br />
-                Fiscora tells you the <span className="text-gradient">story</span>.
+                This tells you the <span className="text-gradient">story</span>.
               </h1>
 
               <p className="mt-5 max-w-md text-pretty text-base leading-relaxed text-muted sm:text-lg">

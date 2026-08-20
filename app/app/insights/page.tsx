@@ -52,7 +52,7 @@ export default async function InsightsPage({
           <EmptyState
             icon="💡"
             title="Nothing to analyse yet"
-            description="Import a statement and Fiscora will start finding patterns in it."
+            description="Import a statement and it will start finding patterns in it."
             action={
               <Link href="/app/import" className="btn btn-primary h-9">
                 Import a CSV

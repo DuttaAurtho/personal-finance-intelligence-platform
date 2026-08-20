@@ -15,7 +15,7 @@ const BANK_TIPS = [
   },
   {
     bank: "Split debit/credit columns",
-    text: "Banks that use separate 'Money in' and 'Money out' columns are handled automatically — Fiscora negates the outgoing column for you.",
+    text: "Banks that use separate 'Money in' and 'Money out' columns are handled automatically — the outgoing column is negated for you.",
   },
   {
     bank: "Dates",

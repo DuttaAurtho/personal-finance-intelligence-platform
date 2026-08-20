@@ -1,8 +1,8 @@
 {
-  "name": "fiscora",
+  "name": "personal-finance-intelligence-platform",
   "version": "1.0.0",
   "private": true,
-  "description": "Fiscora — Personal Finance Intelligence Platform. Import bank CSVs, auto-categorize, track budgets, detect recurring payments and forecast spending with on-device ML.",
+  "description": "Personal Finance Intelligence Platform. Import bank CSVs, auto-categorize, track budgets, detect recurring payments and forecast spending with on-device ML.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

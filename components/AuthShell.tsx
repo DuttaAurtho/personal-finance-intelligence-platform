@@ -33,7 +33,7 @@ export default function AuthShell({
       {/* Form column */}
       <div className="relative z-10 flex w-full flex-col px-5 py-6 lg:w-[52%]">
         <div className="flex items-center justify-between">
-          <Link href="/" aria-label="Fiscora home">
+          <Link href="/" aria-label="Personal Finance Intelligence Platform home">
             <Logo />
           </Link>
           <ThemeToggle compact />
@@ -59,7 +59,7 @@ export default function AuthShell({
           </p>
           <p className="mt-4 text-sm leading-relaxed text-muted">
             Most people can name their rent and their salary. Almost nobody can name the third
-            biggest thing they spend money on. Fiscora exists to answer that question in about
+            biggest thing they spend money on. This exists to answer that question in about
             thirty seconds.
           </p>
         </blockquote>

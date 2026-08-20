@@ -89,7 +89,7 @@ export async function signOut(): Promise<void> {
 export async function startDemo(): Promise<void> {
   const suffix = randomBytes(4).toString("hex");
   const user = await createUser({
-    email: `demo-${suffix}@fiscora.local`,
+    email: `demo-${suffix}@demo.local`,
     password: randomBytes(18).toString("base64url"),
     name: "Demo User",
     currency: "GBP",

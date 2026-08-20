@@ -114,7 +114,7 @@ export default async function SettingsPage() {
                     ? "hosted libSQL database"
                     : isEphemeral
                       ? "/tmp (temporary)"
-                      : "data/fiscora.db"}
+                      : "data/pfip.db"}
                 </dd>
               </div>
             </dl>

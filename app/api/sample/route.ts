@@ -11,7 +11,7 @@ export async function GET() {
   return new NextResponse(demoCsv(), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="fiscora-sample-statement.csv"',
+      "Content-Disposition": 'attachment; filename="personal-finance-sample-statement.csv"',
       "Cache-Control": "no-store",
     },
   });

@@ -13,7 +13,7 @@ import type { User } from "./types";
  * for and no account data leaving the machine.
  */
 
-const COOKIE = "fiscora_session";
+const COOKIE = "pfip_session";
 const SESSION_DAYS = 30;
 
 /* ---------------------------------------------------------------------- */

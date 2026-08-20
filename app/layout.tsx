@@ -17,8 +17,8 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Fiscora — Personal Finance Intelligence",
-    template: "%s · Fiscora",
+    default: "Personal Finance Intelligence Platform",
+    template: "%s · Personal Finance Intelligence Platform",
   },
   description:
     "Import your bank statements and see where the money actually goes. Automatic categorisation, budget tracking, recurring-payment detection and machine-learned spending forecasts — running entirely on your own machine.",
@@ -30,9 +30,9 @@ export const metadata: Metadata = {
     "expense tracker",
     "financial forecasting",
   ],
-  authors: [{ name: "Fiscora" }],
+  authors: [{ name: "Aurtho Dutta" }],
   openGraph: {
-    title: "Fiscora — Personal Finance Intelligence",
+    title: "Personal Finance Intelligence Platform",
     description:
       "Import bank CSVs, categorise automatically, track budgets and forecast next month's spending. Free, open and private by design.",
     type: "website",
@@ -54,7 +54,7 @@ export const viewport: Viewport = {
  * Kept tiny and inline — a network round-trip here would defeat the purpose.
  */
 const THEME_SCRIPT = `(function(){try{
-var s=localStorage.getItem('fiscora-theme');
+var s=localStorage.getItem('pfip-theme');
 var d=s?s==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;
 if(d)document.documentElement.classList.add('dark');
 }catch(e){}})();`;

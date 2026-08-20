@@ -136,7 +136,7 @@ export default function ImportWizard({ accounts, currency }: Props) {
           </div>
           <p className="text-base font-semibold text-fg">Drop your bank CSV here</p>
           <p className="mt-1.5 max-w-md text-sm text-muted">
-            Fiscora works out which column is which — including banks that split money in and
+            It works out which column is which — including banks that split money in and
             money out across two columns.
           </p>
 

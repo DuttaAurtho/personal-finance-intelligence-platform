@@ -43,7 +43,7 @@ export default async function DashboardPage({
         <EmptyState
           icon="🚀"
           title="Let's get some data in here"
-          description="Import a CSV statement from your bank, or load two years of realistic sample data to see what Fiscora does before committing your own numbers."
+          description="Import a CSV statement from your bank, or load two years of realistic sample data to see what it does before committing your own numbers."
           action={
             <div className="flex flex-wrap justify-center gap-3">
               <Link href="/app/import" className="btn btn-primary h-10 px-4">
@@ -346,7 +346,7 @@ export default async function DashboardPage({
               <EmptyState
                 icon="🎯"
                 title="No budgets yet"
-                description="Fiscora can propose one for every category from your own spending history."
+                description="A budget can be proposed for every category from your own spending history."
                 action={
                   <Link href="/app/budgets" className="btn btn-primary h-9">
                     Set up budgets

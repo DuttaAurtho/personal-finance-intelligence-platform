@@ -125,5 +125,5 @@ export function MobileNav() {
 export function CurrentSection() {
   const pathname = usePathname();
   const item = [...NAV].reverse().find((n) => isActive(pathname, n.href));
-  return <span className="text-sm font-semibold text-fg lg:hidden">{item?.label ?? "Fiscora"}</span>;
+  return <span className="text-sm font-semibold text-fg lg:hidden">{item?.label ?? "Dashboard"}</span>;
 }

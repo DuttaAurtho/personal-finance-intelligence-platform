@@ -22,7 +22,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen bg-canvas">
       {/* ── Sidebar (desktop) ──────────────────────────────────────── */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-line bg-surface px-3 py-4 lg:flex">
-        <Link href="/app" className="mb-6 px-2" aria-label="Fiscora dashboard">
+        <Link href="/app" className="mb-6 px-2" aria-label="Personal Finance Intelligence Platform dashboard">
           <Logo />
         </Link>
 

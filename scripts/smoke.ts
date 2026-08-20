@@ -10,8 +10,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-const dir = mkdtempSync(path.join(tmpdir(), "fiscora-smoke-"));
-process.env.FISCORA_DB = path.join(dir, "smoke.db");
+const dir = mkdtempSync(path.join(tmpdir(), "pfip-smoke-"));
+process.env.PFIP_DB = path.join(dir, "smoke.db");
 
 const { run, get, closeDb } = await import("../lib/db.ts");
 const { ensureUserSetup, importTransactions, suggestBudgets, setBudget, setCategory } =

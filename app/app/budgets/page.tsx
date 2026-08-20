@@ -117,7 +117,7 @@ export default async function BudgetsPage({
           <EmptyState
             icon="🎯"
             title="No spending history to budget against yet"
-            description="Import a couple of months of transactions and Fiscora can propose a realistic budget for every category."
+            description="Import a couple of months of transactions and a realistic budget can be proposed for every category."
             action={
               <Link href="/app/import" className="btn btn-primary h-9">
                 Import a CSV

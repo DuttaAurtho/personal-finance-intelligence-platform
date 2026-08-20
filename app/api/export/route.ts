@@ -67,7 +67,7 @@ export async function GET(request: Request) {
   // The leading BOM makes Excel read this as UTF-8 rather than mangling the
   // currency symbols and any non-ASCII merchant names.
   const csv = "﻿" + toCsv(headers, rows);
-  const filename = `fiscora-transactions-${todayISO()}.csv`;
+  const filename = `personal-finance-transactions-${todayISO()}.csv`;
 
   return new NextResponse(csv, {
     headers: {
