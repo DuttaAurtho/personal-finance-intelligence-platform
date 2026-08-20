@@ -55,6 +55,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
 
           <p className="border-t border-line px-1 pt-3 text-[0.6875rem] leading-relaxed text-subtle">
+            <span className="font-medium text-muted">Built as a personal project</span>
+            <br />
             Made by <span className="font-medium text-muted">Aurtho Dutta</span>
             <br />
             <a
