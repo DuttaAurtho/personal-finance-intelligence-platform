@@ -195,11 +195,13 @@ export default async function LandingPage() {
       {/* ── Privacy + closing call to action ──────────────────────── */}
       <section id="privacy" className="relative z-10 border-t border-line/60 py-24">
         <div className="mx-auto max-w-2xl px-5 text-center">
-          <div
-            aria-hidden="true"
-            className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-soft text-xl"
-          >
-            🔒
+          <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-soft text-brand">
+            <svg
+              width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+            >
+              <path d="M6.5 10.5V8a5.5 5.5 0 1 1 11 0v2.5M5 10.5h14V20H5v-9.5ZM12 14v2.5" />
+            </svg>
           </div>
 
           <h2 className="text-2xl font-semibold tracking-tight text-fg sm:text-3xl">
@@ -226,12 +228,61 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Footer ────────────────────────────────────────────────── */}
-      <footer className="relative z-10 border-t border-line/60 py-10">
-        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 px-5 sm:flex-row">
-          <Logo size={22} />
-          <div className="text-center text-sm text-subtle sm:text-left">
-            <p className="font-medium text-muted">Built as a personal project</p>
-            <p className="mt-1">
+      <footer className="relative z-10 border-t border-line/60 pt-14 pb-10">
+        <div className="mx-auto max-w-5xl px-5">
+          <div className="grid gap-10 md:grid-cols-[1.4fr_1fr]">
+            <div>
+              <Logo size={26} />
+              <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted">
+                Import a CSV or log what you spend as you go. It categorises the lot, finds the
+                subscriptions you forgot, and shows you where the money actually went.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-subtle">
+                  Product
+                </h3>
+                <ul className="mt-3 space-y-2 text-sm">
+                  <li><a href="#features" className="text-muted hover:text-fg">Features</a></li>
+                  <li><a href="#how" className="text-muted hover:text-fg">How it works</a></li>
+                  <li><a href="#privacy" className="text-muted hover:text-fg">Privacy</a></li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-subtle">
+                  Get started
+                </h3>
+                <ul className="mt-3 space-y-2 text-sm">
+                  <li><Link href="/register" className="text-muted hover:text-fg">Create an account</Link></li>
+                  <li><Link href="/login" className="text-muted hover:text-fg">Sign in</Link></li>
+                  <li>
+                    <a href="/api/sample" className="text-muted hover:text-fg">Sample statement</a>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-12 rounded-[var(--radius)] border border-line bg-surface-2/60 px-5 py-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-subtle">
+              About your data
+            </h3>
+            <p className="mt-2 text-[0.8125rem] leading-relaxed text-muted">
+              {isRemoteDb
+                ? "Your transactions live in a SQLite database reachable only with your own access token. There is no analytics script, no telemetry and no third party in the loop — the categorisation and forecasting run on this server, not in an external API."
+                : "Your transactions live in a single SQLite file on this machine. There is no analytics script, no telemetry and no external API call anywhere in the app — the categorisation and forecasting run in-process."}{" "}
+              Everything you import can be exported straight back out as CSV.
+            </p>
+          </div>
+
+          <div className="mt-8 flex flex-col items-start justify-between gap-3 border-t border-line/60 pt-6 sm:flex-row sm:items-center">
+            <p className="text-sm text-subtle">
+              © {new Date().getFullYear()} Personal Finance Intelligence Platform. Built as a
+              personal project.
+            </p>
+            <p className="text-sm text-subtle">
               Made by <span className="font-medium text-muted">Aurtho Dutta</span> ·{" "}
               <a
                 href="mailto:dutta.aurtho@gmail.com"
@@ -240,10 +291,6 @@ export default async function LandingPage() {
                 dutta.aurtho@gmail.com
               </a>
             </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/login" className="btn btn-ghost">Sign in</Link>
-            <ThemeToggle compact />
           </div>
         </div>
       </footer>

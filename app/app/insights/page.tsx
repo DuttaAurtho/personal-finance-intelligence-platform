@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { availableMonths, getDashboard } from "@/lib/dashboard";
-import { currentMonth, formatDate, formatMonth } from "@/lib/dates";
+import { getCategoryTotals, getDateBounds, getKpis, getTopMerchants } from "@/lib/analytics";
+import { addMonths, currentMonth, formatDate, formatMonth, monthStart, todayISO } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import CategoryIcon from "@/components/CategoryIcon";
 import ToneIcon from "@/components/ToneIcon";
@@ -14,6 +15,21 @@ import RankedBars from "@/components/charts/RankedBars";
 
 export const metadata: Metadata = { title: "Insights" };
 export const dynamic = "force-dynamic";
+
+/**
+ * How far back the "over time" view looks.
+ *
+ * Whole calendar months rather than rolling 30-day windows: someone reviewing
+ * where their money went thinks in months, and a rolling window would compare
+ * a partial month against a full one and make the trend look like a drop.
+ */
+const RANGES = [
+  { key: "1m", label: "This month", months: 1 },
+  { key: "3m", label: "3 months", months: 3 },
+  { key: "6m", label: "6 months", months: 6 },
+  { key: "12m", label: "12 months", months: 12 },
+  { key: "all", label: "All time", months: 0 },
+] as const;
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -34,7 +50,7 @@ const TONE_WORD = {
 export default async function InsightsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; range?: string }>;
 }) {
   const user = await requireUser();
   const sp = await searchParams;
@@ -44,6 +60,26 @@ export default async function InsightsPage({
 
   const data = await getDashboard(user, month);
   const cur = user.currency;
+
+  /* ── The "over time" view, independent of the month picker ────────── */
+  const range = RANGES.find((r) => r.key === sp.range) ?? RANGES[2];
+  const bounds = await getDateBounds(user.id);
+  const rangeTo = todayISO();
+  const rangeFrom =
+    range.months === 0
+      ? (bounds?.min ?? monthStart(currentMonth()))
+      : monthStart(addMonths(currentMonth(), -(range.months - 1)));
+
+  const [rangeKpis, rangeCategories, rangeMerchants] = await Promise.all([
+    getKpis(user.id, rangeFrom, rangeTo),
+    getCategoryTotals(user.id, rangeFrom, rangeTo),
+    getTopMerchants(user.id, rangeFrom, rangeTo, 8),
+  ]);
+
+  const monthsCovered =
+    range.months === 0 && bounds
+      ? Math.max(1, Math.round((Date.parse(rangeTo) - Date.parse(bounds.min)) / 2_629_800_000))
+      : range.months;
 
   if (!data) {
     return (
@@ -82,6 +118,115 @@ export default async function InsightsPage({
         />
         <MonthPicker months={months} value={month} />
       </div>
+
+      {/* ── Where it went over time ────────────────────────────────── */}
+      <Card>
+        <CardHeader
+          title="Where your money goes over time"
+          subtitle="Log what you spend as you go, then look back over a longer stretch to see the pattern"
+          action={
+            <div className="flex flex-wrap gap-1">
+              {RANGES.map((r) => (
+                <Link
+                  key={r.key}
+                  href={`/app/insights?range=${r.key}`}
+                  scroll={false}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                    r.key === range.key
+                      ? "bg-brand text-brand-fg"
+                      : "text-muted hover:bg-surface-3 hover:text-fg"
+                  }`}
+                >
+                  {r.label}
+                </Link>
+              ))}
+            </div>
+          }
+        />
+
+        {rangeKpis.transactionCount === 0 ? (
+          <EmptyState
+            title="Nothing recorded in this period yet"
+            description="Add what you spend as it happens, or import a statement. Once a few weeks have built up, this is where the pattern shows."
+            action={
+              <Link href="/app/transactions" className="btn btn-primary h-9">
+                Add a transaction
+              </Link>
+            }
+          />
+        ) : (
+          <div className="px-5 py-5">
+            <div className="mb-5 grid gap-4 sm:grid-cols-3">
+              <div>
+                <p className="text-[0.8125rem] text-muted">Spent in this period</p>
+                <p className="mt-1 text-2xl font-semibold tracking-tight text-fg">
+                  {formatMoney(rangeKpis.spendMinor, cur)}
+                </p>
+                <p className="mt-0.5 text-xs text-subtle">
+                  {formatDate(rangeFrom)} — {formatDate(rangeTo)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[0.8125rem] text-muted">Average per month</p>
+                <p className="mt-1 text-2xl font-semibold tracking-tight text-fg">
+                  {formatMoney(Math.round(rangeKpis.spendMinor / Math.max(1, monthsCovered)), cur)}
+                </p>
+                <p className="mt-0.5 text-xs text-subtle">
+                  across {monthsCovered} {monthsCovered === 1 ? "month" : "months"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[0.8125rem] text-muted">Recorded</p>
+                <p className="mt-1 text-2xl font-semibold tracking-tight text-fg">
+                  {rangeKpis.transactionCount.toLocaleString("en-GB")}
+                </p>
+                <p className="mt-0.5 text-xs text-subtle">
+                  {formatMoney(rangeKpis.dailyAverageMinor, cur)} a day on average
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div>
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-subtle">
+                  By category
+                </h3>
+                <RankedBars
+                  currency={cur}
+                  items={rangeCategories.slice(0, 8).map((c) => ({
+                    label: c.category,
+                    valueMinor: c.totalMinor,
+                    share: c.share,
+                    count: c.count,
+                    href: `/app/transactions?category=${encodeURIComponent(c.category)}`,
+                  }))}
+                />
+              </div>
+
+              <div>
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-subtle">
+                  By merchant
+                </h3>
+                {rangeMerchants.length ? (
+                  <RankedBars
+                    withIcons={false}
+                    currency={cur}
+                    items={rangeMerchants.map((m) => ({
+                      label: merchantLabel(m.merchant),
+                      valueMinor: m.total,
+                      count: m.n,
+                      share: m.total / Math.max(1, rangeKpis.spendMinor),
+                      href: `/app/transactions?q=${encodeURIComponent(m.merchant)}`,
+                    }))}
+                  />
+                ) : (
+                  <p className="py-6 text-center text-sm text-subtle">No merchant data yet.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
 
       {/* ── The findings ───────────────────────────────────────────── */}
       {data.insights.length ? (

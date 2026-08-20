@@ -4,6 +4,7 @@ import { all, get } from "@/lib/db";
 import { listAccounts, listRules } from "@/lib/repository";
 import { countTransactions, getDateBounds } from "@/lib/analytics";
 import { formatDate } from "@/lib/dates";
+import CategoryIcon from "@/components/CategoryIcon";
 import { Card, CardHeader, PageHeader } from "@/components/ui";
 import {
   DangerPanel,
@@ -143,7 +144,7 @@ export default async function SettingsPage() {
                         className="chip border-line bg-surface-2 text-muted"
                         title={c.name}
                       >
-                        <span aria-hidden="true">{c.icon}</span>
+                        <CategoryIcon category={c.name} size={13} />
                         {c.name}
                       </li>
                     ))}

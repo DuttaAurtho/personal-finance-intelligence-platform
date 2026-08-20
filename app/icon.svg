@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!--
+    Browser-tab mark. A tab favicon renders at 16px, so this is the lockup's
+    symbol only — no wordmark, thicker strokes and wider gaps than the in-app
+    logo, because hairlines disappear entirely at that size.
+  -->
+  <defs>
+    <linearGradient id="b" x1="6" y1="44" x2="42" y2="8" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5eead4"/>
+      <stop offset=".5" stop-color="#0d9488"/>
+      <stop offset="1" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="48" height="48" rx="11" fill="#0b1220"/>
+
+  <rect x="8" y="28" width="8" height="13" rx="4" fill="url(#b)" opacity=".6"/>
+  <rect x="20" y="21" width="8" height="20" rx="4" fill="url(#b)" opacity=".82"/>
+  <rect x="32" y="14" width="8" height="27" rx="4" fill="url(#b)"/>
+
+  <path d="M7 38C9.5 27.5 16 18 33 11" stroke="#2dd4bf" stroke-width="3.4" stroke-linecap="round" fill="none"/>
+  <circle cx="34.5" cy="10.5" r="4.2" fill="#2dd4bf"/>
+</svg>
