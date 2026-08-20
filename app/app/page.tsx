@@ -7,6 +7,9 @@ import { formatMoney, formatPercent, formatPercentAbs, pctChange } from "@/lib/m
 import CategoryIcon from "@/components/CategoryIcon";
 import ToneIcon from "@/components/ToneIcon";
 import { merchantLabel } from "@/lib/categorize";
+import { all } from "@/lib/db";
+import { listAccounts } from "@/lib/repository";
+import AddTransactionButton from "@/components/AddTransactionButton";
 import { Badge, Card, CardHeader, EmptyState, SectionLabel, StatTile } from "@/components/ui";
 import MonthPicker from "@/components/MonthPicker";
 import TrendChart from "@/components/charts/TrendChart";
@@ -38,20 +41,38 @@ export default async function DashboardPage({
   const data = await getDashboard(user, month);
   const cur = user.currency;
 
+  // Needed by the empty state's inline "add a transaction" form.
+  const [categories, accountRows] = await Promise.all([
+    all<{ name: string; kind: string }>(
+      "SELECT name, kind FROM categories WHERE user_id = ? ORDER BY sort ASC",
+      user.id,
+    ),
+    listAccounts(user.id),
+  ]);
+  const accounts = accountRows.map((a) => ({ id: a.id, name: a.name }));
+
   if (!data) {
     return (
       <Card>
         <EmptyState
-          title="Let's get some data in here"
-          description="Import a CSV statement from your bank, or load two years of realistic sample data to see what it does before committing your own numbers."
+          title="Start tracking your spending"
+          description="Add what you spend as it happens — pick a category, type the amount, done. If your bank gives you a CSV you can import that instead, but you don't need one to get started."
           action={
-            <div className="flex flex-wrap justify-center gap-3">
-              <Link href="/app/import" className="btn btn-primary h-10 px-4">
-                Import a CSV
-              </Link>
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex flex-wrap justify-center gap-3">
+                <AddTransactionButton
+                  categories={categories}
+                  accounts={accounts}
+                  currency={cur}
+                  size="lg"
+                />
+                <Link href="/app/import" className="btn btn-secondary h-10 px-4">
+                  Import a CSV instead
+                </Link>
+              </div>
               <form action={startDemo}>
-                <button type="submit" className="btn btn-secondary h-10 px-4">
-                  Load sample data
+                <button type="submit" className="btn btn-ghost text-xs">
+                  or fill it with sample data to look around
                 </button>
               </form>
             </div>
@@ -203,8 +224,8 @@ export default async function DashboardPage({
             title="Spending over time"
             subtitle={
               data.forecast
-                ? `Last ${data.history.length} months, with next month forecast by the model ensemble`
-                : `Last ${data.history.length} months`
+                ? `Last ${data.history.length} ${data.history.length === 1 ? "month" : "months"}, with next month forecast by the model ensemble`
+                : `Last ${data.history.length} ${data.history.length === 1 ? "month" : "months"}`
             }
             action={
               <Link href="/app/forecast" className="btn btn-ghost text-xs">

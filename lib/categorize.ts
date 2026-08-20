@@ -116,7 +116,15 @@ export function merchantKey(raw: string): string {
     .trim();
 
   // Two words are plenty to identify a merchant and keeps branches together.
-  return s.split(" ").filter(Boolean).slice(0, 2).join(" ");
+  const words = s.split(" ").filter(Boolean).slice(0, 2);
+
+  // Hand-typed descriptions are prose, not merchant names, so truncating at two
+  // words can leave a dangling preposition — "dinner with friends" became
+  // "Dinner With". Drop a trailing joining word rather than display that.
+  const DANGLING = new Set(["with", "and", "for", "at", "from", "on", "in", "to", "by", "of", "the", "a"]);
+  while (words.length > 1 && DANGLING.has(words[words.length - 1])) words.pop();
+
+  return words.join(" ");
 }
 
 /** Human-facing merchant name: "blue bottle coffee" → "Blue Bottle Coffee" */

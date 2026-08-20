@@ -4,8 +4,10 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { CurrentSection, MobileNav, SidebarLinks } from "@/components/AppNav";
 import { requireUser } from "@/lib/auth";
 import { signOut } from "@/app/actions/auth";
-import { ensureUserSetup } from "@/lib/repository";
+import { ensureUserSetup, listAccounts } from "@/lib/repository";
 import { countTransactions } from "@/lib/analytics";
+import { all } from "@/lib/db";
+import AddTransactionButton from "@/components/AddTransactionButton";
 import { isEphemeralStorage } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +18,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // user created before a schema addition still gets their defaults. Doesn't
   // depend on and isn't depended on by the transaction count, so both run
   // together rather than as two sequential round trips.
-  const [, txCount] = await Promise.all([ensureUserSetup(user.id), countTransactions(user.id)]);
+  // ensureUserSetup must finish before the categories are read, since it is
+  // what creates them for a brand-new account.
+  await ensureUserSetup(user.id);
+  const [txCount, categories, accounts] = await Promise.all([
+    countTransactions(user.id),
+    all<{ name: string; kind: string }>(
+      "SELECT name, kind FROM categories WHERE user_id = ? ORDER BY sort ASC",
+      user.id,
+    ),
+    listAccounts(user.id),
+  ]);
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -80,6 +92,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
 
         <div className="flex items-center gap-1.5">
+          <AddTransactionButton
+            categories={categories}
+            accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
+            currency={user.currency}
+          />
           <Link href="/app/import" className="btn btn-secondary h-9">
             <span aria-hidden="true">↓</span>
             <span className="hidden sm:inline">Import CSV</span>

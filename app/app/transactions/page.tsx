@@ -8,7 +8,6 @@ import { formatMoney, parseAmount } from "@/lib/money";
 import { monthEnd, monthStart } from "@/lib/dates";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import TransactionTable from "@/components/TransactionTable";
-import AddTransactionButton from "@/components/AddTransactionButton";
 
 export const metadata: Metadata = { title: "Transactions" };
 export const dynamic = "force-dynamic";
@@ -93,16 +92,11 @@ export default async function TransactionsPage({
         title="Transactions"
         description="Search, filter and correct. Every category you confirm becomes training data for the classifier."
         action={
-          <div className="flex items-center gap-2">
-            <a href={`/api/export?${queryString({ page: undefined })}`} className="btn btn-secondary h-9">
-              <span aria-hidden="true">↑</span> Export CSV
-            </a>
-            <AddTransactionButton
-              categories={categories}
-              accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
-              currency={user.currency}
-            />
-          </div>
+          // "Add transaction" lives in the app header now, so it is reachable
+          // from every page rather than only this one.
+          <a href={`/api/export?${queryString({ page: undefined })}`} className="btn btn-secondary h-9">
+            <span aria-hidden="true">↑</span> Export CSV
+          </a>
         }
       />
 
