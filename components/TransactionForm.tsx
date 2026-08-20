@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useFormStatus } from "react-dom";
 import { saveTransaction, type ManualState } from "@/app/actions/transactions";
 import CategoryIcon from "@/components/CategoryIcon";
@@ -59,6 +60,9 @@ export default function TransactionForm({
 
   const [direction, setDirection] = useState<"in" | "out">("out");
   const [category, setCategory] = useState("Uncategorised");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   // Close once the server confirms the save, not optimistically on submit.
   useEffect(() => {
@@ -87,7 +91,17 @@ export default function TransactionForm({
     document.addEventListener("keydown", onKey);
     // Focus the first field so the form is usable straight from the keyboard.
     dialogRef.current?.querySelector<HTMLInputElement>("input[name=date]")?.focus();
-    return () => document.removeEventListener("keydown", onKey);
+
+    // Freeze the page underneath. Without this, scrolling inside the dialog
+    // hands off to the document once it bottoms out, so the page creeps
+    // around behind the overlay and the dialog appears to drift.
+    const { overflow } = document.body.style;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+    };
   }, [open, onClose]);
 
   const expense = useMemo(() => categories.filter((c) => c.kind === "expense"), [categories]);
@@ -95,13 +109,23 @@ export default function TransactionForm({
   const transfer = useMemo(() => categories.filter((c) => c.kind === "transfer"), [categories]);
   const visible = direction === "in" ? income : expense;
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
   const amountValue = editing ? (Math.abs(initial!.amount_minor) / 100).toFixed(2) : "";
 
-  return (
+  /*
+   * Rendered through a portal into <body>.
+   *
+   * The button that opens this sits inside the app header, which carries a
+   * `backdrop-blur`. Any ancestor with a filter, transform or backdrop-filter
+   * becomes the containing block for `position: fixed` descendants, so the
+   * overlay was being laid out against the 56px header rather than the
+   * viewport — which is what pushed the dialog's heading off the top of the
+   * screen. Escaping to <body> puts it back on the viewport where it belongs.
+   */
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/40 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label={editing ? "Edit transaction" : "Add a transaction"}
@@ -111,8 +135,22 @@ export default function TransactionForm({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div ref={dialogRef} className="card w-full max-w-lg animate-[fade-up_.2s_ease-out]">
-        <header className="flex items-center justify-between border-b border-line px-5 py-4">
+      {/* Centring happens on an inner `min-h-full` wrapper rather than on the
+          scroll container. Centring a flex child directly inside a scrollable
+          box clips whatever overflows *above* the centre line, and that part
+          can never be scrolled to — which hid the top of this form, heading
+          and all, on a short window. */}
+      <div
+        className="flex min-h-full items-center justify-center p-4"
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <div
+          ref={dialogRef}
+          className="card flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col animate-[fade-up_.2s_ease-out]"
+        >
+        <header className="flex shrink-0 items-center justify-between border-b border-line px-5 py-4">
           <h2 className="text-base font-semibold text-fg">
             {editing ? "Edit transaction" : "Add a transaction"}
           </h2>
@@ -126,7 +164,8 @@ export default function TransactionForm({
           </button>
         </header>
 
-        <form action={action} className="space-y-4 px-5 py-5">
+        <form action={action} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
           {editing && <input type="hidden" name="id" value={initial!.id} />}
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -294,14 +333,18 @@ export default function TransactionForm({
             </p>
           )}
 
-          <div className="flex items-center justify-end gap-2 border-t border-line pt-4">
+          </div>
+
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-line px-5 py-4">
             <button type="button" onClick={onClose} className="btn btn-secondary h-10 px-4">
               Cancel
             </button>
             <SaveButton editing={editing} />
           </div>
         </form>
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
